@@ -13,7 +13,7 @@
 ### 3. Netlify
 1. Subir esta carpeta a GitHub
 2. netlify.com → New site from Git → seleccionar el repo
-3. En Site settings → Integrations → Neon → Connect (agrega `NETLIFY_DATABASE_URL` automático)
+3. En Site settings → Environment variables → agregar `DATABASE_URL` con la connection string de Neon
 4. En Site settings → Environment variables → agregar:
    - `ANTHROPIC_API_KEY` = tu key de Claude
    - `OPENWEATHER_API_KEY` = (opcional) de openweathermap.org para clima real
