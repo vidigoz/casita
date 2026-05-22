@@ -130,7 +130,7 @@ function setGreeting() {
 // ── Navigation ───────────────────────────────────────────────
 const TABS_WITH_FAB = ['pendientes','mandado','recetas','proyectos'];
 
-function goTab(name) {
+function goTab(name, opts={}) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('pg-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
@@ -149,7 +149,7 @@ function goTab(name) {
   if (name==='recetas')    loadRecipes(false);
   if (name==='proyectos')  loadProjects();
   if (name==='ajustes')    loadSettings();
-  if (name==='chat')       document.getElementById('chat-input').focus();
+  if (name==='chat' && opts.focus!==false) document.getElementById('chat-input').focus();
 }
 
 function swMandado(tab, btn) {
@@ -704,17 +704,37 @@ function toggleVoice() {
   if (isListening) {
     voiceRecognition.stop();
   } else {
-    try {
-      voiceRecognition.start();
-      isListening = true;
-      document.getElementById('chat-mic-btn').classList.add('listening');
-    } catch(e) { toast('No pude iniciar el micrófono'); }
+    startVoice();
   }
+}
+
+function openChatAndListen() {
+  goTab('chat', {focus:false});
+  startVoice();
+}
+
+function startVoice() {
+  if (!voiceRecognition) { toast('Tu navegador no soporta voz'); return; }
+  if (isListening) {
+    setVoiceButtons(true);
+    return;
+  }
+  try {
+    voiceRecognition.start();
+    isListening = true;
+    setVoiceButtons(true);
+  } catch(e) { toast('No pude iniciar el micrófono'); }
 }
 
 function stopVoice() {
   isListening = false;
-  document.getElementById('chat-mic-btn')?.classList.remove('listening');
+  setVoiceButtons(false);
+}
+
+function setVoiceButtons(listening) {
+  ['chat-mic-btn','big-mic-btn','fab'].forEach(id=>{
+    document.getElementById(id)?.classList.toggle('listening', listening);
+  });
 }
 
 // ── RECEIPT SCAN ─────────────────────────────────────────────

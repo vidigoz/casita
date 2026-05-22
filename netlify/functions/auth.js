@@ -2,10 +2,10 @@ import { sql, ok, err, cors, body } from './_lib.js';
 export const handler = async ev => {
   if (ev.httpMethod==='OPTIONS') return cors();
   const b = body(ev);
-  const email = (b.email||'').toLowerCase().trim();
-  if (!email||!email.includes('@')) return err('Email inválido');
   try {
     if (b.action==='register') {
+      const email = (b.email||'').toLowerCase().trim();
+      if (!email||!email.includes('@')) return err('Email inválido');
       if (!b.casita_name) return err('Falta el nombre');
       const ex = await sql`SELECT id FROM users WHERE email=${email}`;
       if (ex.length) return err('Ese correo ya tiene cuenta. Inicia sesión.');
@@ -13,6 +13,8 @@ export const handler = async ev => {
       return ok({user:r[0]});
     }
     if (b.action==='login') {
+      const email = (b.email||'').toLowerCase().trim();
+      if (!email||!email.includes('@')) return err('Email inválido');
       const r = await sql`UPDATE users SET created_at=created_at WHERE email=${email} RETURNING id,email,casita_name,household_size,city`;
       if (!r.length) return err('No existe cuenta con ese correo. Crea una.');
       return ok({user:r[0]});
