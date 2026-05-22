@@ -154,7 +154,7 @@ function goTab(name, opts={}) {
   if (name==='inicio')     loadInicio();
   if (name==='pendientes') loadTasks();
   if (name==='mandado')    loadMandado();
-  if (name==='recetas')    loadRecipes(false);
+  if (name==='recetas')    { if (!currentRecipes.length) loadRecipes(false); }
   if (name==='proyectos')  loadProjects();
   if (name==='ajustes')    loadSettings();
   if (name==='chat' && opts.focus!==false) document.getElementById('chat-input').focus();
@@ -486,16 +486,11 @@ function renderRecipes(recipes) {
     el.innerHTML = '<div class="empty"><h3>Sin sugerencias</h3><p>Agrega ingredientes a tu despensa para ver recetas</p></div>';
     return;
   }
-  const emojis = {'mexicana':'🌮','italiana':'🍝','asiatica':'🍜','americana':'🍔','española':'🥘','otra':'🍲'};
-  const mealLabels = {desayuno:'☀️ desayuno',comida:'🍽️ comida',cena:'🌙 cena'};
+  const mealLabels = {desayuno:'desayuno',comida:'comida',cena:'cena'};
   el.innerHTML = recipes.map((r,i)=>`
-    <div class="recipe-card" onclick="openRecipe(${i})">
-      <div class="recipe-img">
-        <span>${emojis[r.cuisine]||'🍽️'}</span>
-        <span class="recipe-meal">${mealLabels[r.meal_type]||'🍽️ receta'}</span>
-        <span class="recipe-tag" style="position:absolute;top:.75rem;right:.75rem">${r.cuisine||'receta'}</span>
-      </div>
+    <div class="recipe-card" data-idx="${i}" onclick="openRecipe(${i})">
       <div class="recipe-body">
+        <div class="recipe-meal-label">${mealLabels[r.meal_type]||'receta'}</div>
         <div class="recipe-name">${esc(r.name)}</div>
         <div class="recipe-meta">
           <span>⏱ ${r.time||'30 min'}</span>
@@ -504,8 +499,71 @@ function renderRecipes(recipes) {
             ${r.available?'✓ tienes todo':'⚠ falta algo'}
           </span>
         </div>
+        ${r.description?`<div class="recipe-desc">${esc(r.description)}</div>`:''}
       </div>
     </div>`).join('');
+  attachSwipeToCards();
+}
+
+function attachSwipeToCards() {
+  document.querySelectorAll('#recipes-container .recipe-card').forEach(card => {
+    let startX = 0, startY = 0, dragging = false;
+    card.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dragging = true;
+    }, {passive:true});
+    card.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) && dx > 0) {
+        card.style.transform = `translateX(${Math.min(dx, 200)}px)`;
+        card.style.opacity = Math.max(0, 1 - dx / 200);
+      }
+    }, {passive:true});
+    card.addEventListener('touchend', e => {
+      dragging = false;
+      const dx = e.changedTouches[0].clientX - startX;
+      if (dx > 80) {
+        card.style.transition = 'transform .25s ease, opacity .25s ease';
+        card.style.transform = 'translateX(110%)';
+        card.style.opacity = '0';
+        const idx = parseInt(card.dataset.idx);
+        setTimeout(() => swipeReplaceRecipe(idx), 280);
+      } else {
+        card.style.transition = 'transform .2s ease, opacity .2s ease';
+        card.style.transform = '';
+        card.style.opacity = '';
+        setTimeout(() => { card.style.transition = ''; }, 220);
+      }
+    }, {passive:true});
+  });
+}
+
+async function swipeReplaceRecipe(idx) {
+  const mealType = currentRecipes[idx]?.meal_type;
+  if (!mealType) return;
+  const card = document.querySelector(`#recipes-container .recipe-card[data-idx="${idx}"]`);
+  if (card) {
+    card.style.transition = '';
+    card.innerHTML = '<div class="recipe-body" style="min-height:80px;display:flex;align-items:center;justify-content:center"><div class="spinner"></div></div>';
+    card.style.transform = '';
+    card.style.opacity = '1';
+  }
+  try {
+    const pantryRes = USER.guest ? null : await api('pantry').catch(()=>null);
+    const pantry = pantryRes?.items || [];
+    const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset+10+idx,single_meal:mealType}});
+    const newRecipes = d.recipes || [];
+    const match = newRecipes.find(r=>r.meal_type===mealType) || newRecipes[0];
+    if (match) {
+      currentRecipes[idx] = match;
+      renderRecipes(currentRecipes);
+    }
+  } catch(e) {
+    renderRecipes(currentRecipes);
+  }
 }
 
 function openRecipe(idx) {

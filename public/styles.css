@@ -233,19 +233,14 @@ body::before{
 .recipe-card{
   background:var(--white);border:.5px solid var(--line);border-radius:16px;
   overflow:hidden;box-shadow:var(--sh0);cursor:pointer;transition:all .18s;
+  touch-action:pan-y;will-change:transform;
 }
 .recipe-card:hover{box-shadow:var(--sh1);transform:translateY(-1px)}
-.recipe-img{
-  height:120px;background:var(--gbg);
-  display:flex;align-items:center;justify-content:center;
-  font-size:3.5rem;border-bottom:.5px solid var(--line);
-  position:relative;
-}
 .recipe-body{padding:.875rem 1rem}
+.recipe-meal-label{font-size:.68rem;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem}
 .recipe-name{font-family:var(--serif);font-size:1.0625rem;font-weight:500;color:var(--ink);margin-bottom:.375rem}
 .recipe-meta{font-size:.75rem;color:var(--ink2);display:flex;align-items:center;gap:.375rem .625rem;flex-wrap:wrap}
-.recipe-tag{font-size:.68rem;padding:.2rem .55rem;border-radius:100px;background:var(--gbg);color:var(--g);font-weight:500}
-.recipe-meal{position:absolute;top:.75rem;left:.75rem;font-size:.68rem;padding:.2rem .55rem;border-radius:100px;background:var(--white);color:var(--ink2);font-weight:600;box-shadow:var(--sh0)}
+.recipe-desc{font-size:.8rem;color:var(--ink2);margin-top:.4rem;line-height:1.4}
 
 /* Recipe detail modal */
 .modal-bg{position:fixed;inset:0;z-index:100;background:rgba(40,38,31,.45);display:flex;align-items:flex-end;justify-content:center}
