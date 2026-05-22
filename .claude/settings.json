@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sips -z 512 512 /Users/vidigoz/casita/public/icons/logo.png --out /Users/vidigoz/casita/public/icons/icon-512.png)",
+      "Bash(sips -z 192 192 /Users/vidigoz/casita/public/icons/logo.png --out /Users/vidigoz/casita/public/icons/icon-192.png)",
+      "Bash(sips -z 180 180 /Users/vidigoz/casita/public/icons/logo.png --out /Users/vidigoz/casita/public/icons/icon-180.png)",
+      "Bash(sips -z 32 32 /Users/vidigoz/casita/public/icons/logo.png --out /Users/vidigoz/casita/public/icons/icon-32.png)"
+    ]
+  }
+}
