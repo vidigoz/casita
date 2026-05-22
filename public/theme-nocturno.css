@@ -1,0 +1,340 @@
+/* ─────────────────────────────────────────────────────────────
+   CASITA · TEMA "NOCTURNO"
+   Barro oscuro + ámbar vela + vino · calidez de noche
+   Aplicar con: <html data-theme="nocturno"> o JS:
+     document.documentElement.dataset.theme = 'nocturno';
+   ───────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root[data-theme="nocturno"] {
+  /* ── Superficies (barro oscuro cálido — no negro frío) ── */
+  --bg:    #1A1410;
+  --bg2:   #221C14;
+  --bg3:   #2E2418;
+  --white: #2A2018;   /* "white" en modo noche = surface elevada */
+
+  /* ── Tinta (crema cálida sobre oscuro) ── */
+  --ink:   #F5EED8;
+  --ink2:  #C4B898;
+  --ink3:  #7D7060;
+
+  /* ── Líneas ── */
+  --line:  #3A3020;
+  --line2: #4A3E28;
+
+  /* ── Acción primaria (ámbar vela) ── */
+  --g:     #D4922A;
+  --g2:    #E0A840;
+  --g3:    #ECC060;
+  --gbg:   #3D2C14;
+  --gbg2:  #4D3818;
+
+  /* ── Alertas (vino) ── */
+  --r:     #C4607A;
+  --rbg:   #2A1420;
+
+  /* ── Avisos (papaya nocturno) ── */
+  --y:     #C87828;
+  --ybg:   #2E2010;
+
+  /* ── Tipografía ── */
+  --serif: "DM Serif Display", Georgia, serif;
+  --sans:  "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  /* ── Sombras ── */
+  --sh0: 0 1px 3px rgba(0,0,0,.25);
+  --sh1: 0 2px 10px -2px rgba(0,0,0,.35);
+  --sh2: 0 8px 28px -4px rgba(0,0,0,.5);
+  --shg: 0 6px 20px -4px rgba(212,146,42,.45);
+}
+
+/* ═════ AJUSTES ESPECÍFICOS DEL TEMA NOCTURNO ═══════════════ */
+
+/* Fondo del body: oscuro cálido con manchas de ámbar muy sutiles */
+:root[data-theme="nocturno"] body {
+  background: #0F0D09;
+}
+:root[data-theme="nocturno"] body::before {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(212,146,42,.07), transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(139,46,74,.06), transparent 50%) !important;
+}
+
+/* Shell del app con borde sutil de ámbar */
+:root[data-theme="nocturno"] #app {
+  box-shadow:
+    0 0 0 1px #3A3020,
+    0 32px 80px -16px rgba(0,0,0,.6) !important;
+}
+
+/* Brand — ámbar italic, puntito más suave */
+:root[data-theme="nocturno"] .brand {
+  color: var(--ink);
+  font-weight: 400;
+}
+:root[data-theme="nocturno"] .brand::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--g);
+  margin-left: 3px;
+  transform: translateY(-10px);
+}
+:root[data-theme="nocturno"] .brand-sub {
+  color: var(--ink3);
+}
+
+/* Header con separador sutil */
+:root[data-theme="nocturno"] .header {
+  background: var(--bg);
+  border-bottom-color: var(--line);
+}
+
+/* Hdr btn */
+:root[data-theme="nocturno"] .hdr-btn:hover {
+  background: var(--bg2);
+}
+
+/* Greeting — ámbar en el nombre */
+:root[data-theme="nocturno"] .greeting h1 em {
+  color: var(--g);
+  font-style: italic;
+}
+
+/* Cards en modo noche — superficie elevada */
+:root[data-theme="nocturno"] .card {
+  background: var(--white);
+  border-color: var(--line);
+  box-shadow: var(--sh0);
+}
+:root[data-theme="nocturno"] .card-tinted {
+  background: var(--bg2);
+  border-color: var(--line);
+}
+:root[data-theme="nocturno"] .card-green {
+  background: var(--gbg);
+  border-color: var(--gbg2);
+}
+:root[data-theme="nocturno"] .card-warn {
+  background: var(--ybg);
+  border-color: var(--line2);
+}
+
+/* Inputs */
+:root[data-theme="nocturno"] .ibox {
+  background: var(--bg2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme="nocturno"] .ibox:focus {
+  border-color: var(--g2);
+  background: var(--bg3);
+}
+:root[data-theme="nocturno"] input::placeholder {
+  color: var(--ink3);
+  font-style: italic;
+  font-family: var(--serif);
+}
+
+/* Seg (tabs internos) */
+:root[data-theme="nocturno"] .seg {
+  background: var(--bg2);
+}
+:root[data-theme="nocturno"] .seg-btn.on {
+  background: var(--bg3);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+:root[data-theme="nocturno"] .seg-btn {
+  color: var(--ink2);
+}
+
+/* Rows */
+:root[data-theme="nocturno"] .row {
+  border-bottom-color: var(--bg3);
+}
+:root[data-theme="nocturno"] .chk {
+  background: var(--bg2);
+  border-color: var(--line2);
+}
+:root[data-theme="nocturno"] .chk.done {
+  background: var(--g);
+  border-color: var(--g);
+}
+
+/* Big mic — degradado ámbar nocturno */
+:root[data-theme="nocturno"] .big-mic {
+  background: linear-gradient(135deg, #D4922A 0%, #B8501A 100%);
+  box-shadow: 0 10px 28px -4px rgba(212,146,42,.4), 0 0 0 8px rgba(212,146,42,.06);
+}
+:root[data-theme="nocturno"] .big-mic:hover {
+  box-shadow: 0 14px 36px -4px rgba(212,146,42,.5), 0 0 0 12px rgba(212,146,42,.08);
+}
+
+/* FAB */
+:root[data-theme="nocturno"] .fab {
+  background: linear-gradient(135deg, #D4922A, #B8501A);
+  box-shadow: 0 4px 16px -2px rgba(212,146,42,.5);
+}
+
+/* Icon buttons */
+:root[data-theme="nocturno"] .icon-btn {
+  background: var(--g);
+  box-shadow: 0 2px 8px -2px rgba(212,146,42,.35);
+}
+:root[data-theme="nocturno"] .icon-btn:hover {
+  background: var(--g2);
+}
+:root[data-theme="nocturno"] .icon-btn:disabled {
+  background: var(--line);
+  box-shadow: none;
+}
+
+/* Botones */
+:root[data-theme="nocturno"] .btn-primary {
+  background: var(--g);
+  box-shadow: var(--shg);
+}
+:root[data-theme="nocturno"] .btn-primary:hover {
+  background: var(--g2);
+}
+:root[data-theme="nocturno"] .btn-ghost {
+  border-color: var(--line2);
+  color: var(--ink2);
+}
+:root[data-theme="nocturno"] .btn-ghost:hover {
+  background: var(--bg2);
+  border-color: var(--line2);
+}
+:root[data-theme="nocturno"] .btn-danger {
+  background: #8B2E4A;
+}
+
+/* Nav inferior */
+:root[data-theme="nocturno"] .nav {
+  background: var(--bg);
+  border-top-color: var(--line);
+}
+:root[data-theme="nocturno"] .nav-btn {
+  color: var(--ink3);
+}
+:root[data-theme="nocturno"] .nav-btn.on {
+  background: var(--gbg);
+  color: var(--g);
+}
+
+/* Chat bubbles */
+:root[data-theme="nocturno"] .bubble-ai {
+  background: var(--gbg);
+  color: var(--ink);
+}
+:root[data-theme="nocturno"] .bubble-user {
+  background: var(--g);
+  color: #1A1410;
+}
+:root[data-theme="nocturno"] .chat-input-bar {
+  background: var(--bg);
+  border-top-color: var(--line);
+}
+
+/* Pills */
+:root[data-theme="nocturno"] .pill-g { background: var(--gbg); color: var(--g2); }
+:root[data-theme="nocturno"] .pill-y { background: var(--ybg); color: var(--y); }
+:root[data-theme="nocturno"] .pill-r { background: var(--rbg); color: var(--r); }
+
+/* Dots de estado */
+:root[data-theme="nocturno"] .dot-ok  { background: var(--g2); }
+:root[data-theme="nocturno"] .dot-full { background: var(--g2); }
+:root[data-theme="nocturno"] .dot-enough { background: #D97814; }
+:root[data-theme="nocturno"] .dot-low { background: var(--y); }
+:root[data-theme="nocturno"] .dot-out { background: var(--r); }
+
+:root[data-theme="nocturno"] .level-select.level-full { background: var(--gbg); color: var(--g2); }
+:root[data-theme="nocturno"] .level-select.level-enough { background: #3A2610; color: #E79A36; }
+:root[data-theme="nocturno"] .level-select.level-low { background: var(--ybg); color: #E0A840; }
+:root[data-theme="nocturno"] .level-select.level-out { background: var(--rbg); color: var(--r); }
+
+/* Recipe card */
+:root[data-theme="nocturno"] .recipe-card {
+  background: var(--white);
+  border-color: var(--line);
+}
+:root[data-theme="nocturno"] .recipe-img {
+  background: var(--gbg);
+  border-bottom-color: var(--line);
+}
+:root[data-theme="nocturno"] .recipe-name { color: var(--ink); }
+:root[data-theme="nocturno"] .recipe-tag {
+  background: var(--gbg);
+  color: var(--g2);
+}
+
+/* Proyectos */
+:root[data-theme="nocturno"] .proj-card { border-bottom-color: var(--line); }
+:root[data-theme="nocturno"] .proj-card:hover { background: var(--bg2); }
+:root[data-theme="nocturno"] .proj-icon-check { background: var(--gbg); }
+:root[data-theme="nocturno"] .proj-icon-money { background: var(--ybg); }
+:root[data-theme="nocturno"] .proj-name { color: var(--ink); }
+:root[data-theme="nocturno"] .proj-pct  { color: var(--g); }
+:root[data-theme="nocturno"] .pbar      { background: var(--bg3); }
+:root[data-theme="nocturno"] .pbar-fill { background: var(--g); }
+:root[data-theme="nocturno"] .pbar-fill-y { background: var(--y); }
+
+/* Stat box */
+:root[data-theme="nocturno"] .stat-box { background: var(--bg2); border: 0.5px solid var(--line); }
+:root[data-theme="nocturno"] .stat-v   { color: var(--ink); }
+:root[data-theme="nocturno"] .stat-l   { color: var(--ink3); }
+
+/* Scan zone */
+:root[data-theme="nocturno"] .scan-zone {
+  background: var(--bg2);
+  border-color: var(--line2);
+}
+:root[data-theme="nocturno"] .scan-zone:hover {
+  background: var(--bg3);
+  border-color: var(--g2);
+}
+:root[data-theme="nocturno"] .scan-icon {
+  background: var(--gbg);
+  color: var(--g);
+}
+
+/* Modal */
+:root[data-theme="nocturno"] .modal { background: var(--bg); }
+:root[data-theme="nocturno"] .modal-header { background: var(--bg); border-bottom-color: var(--line); }
+:root[data-theme="nocturno"] .modal-close  { background: var(--bg2); color: var(--ink2); }
+:root[data-theme="nocturno"] .modal-close:hover { background: var(--bg3); }
+
+/* Toast */
+:root[data-theme="nocturno"] .toast {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* Settings */
+:root[data-theme="nocturno"] .sfield {
+  background: var(--bg2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme="nocturno"] .sfield:focus { border-color: var(--g2); }
+
+/* Weather */
+:root[data-theme="nocturno"] .weather-city { color: var(--ink); }
+:root[data-theme="nocturno"] .weather-alert { color: var(--r); }
+
+/* Empty states */
+:root[data-theme="nocturno"] .empty h3 { color: var(--ink2); }
+:root[data-theme="nocturno"] .empty p  { color: var(--ink3); }
+
+/* Back btn */
+:root[data-theme="nocturno"] .back-btn { color: var(--g); }
+
+/* Del btn */
+:root[data-theme="nocturno"] .del-btn:hover { color: var(--r); background: var(--rbg); }
+
+/* Auth */
+:root[data-theme="nocturno"] .auth-error { background: var(--rbg); border-color: var(--r); }

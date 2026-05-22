@@ -21,8 +21,8 @@ let voiceSilenceTimer = null;
 
 const THEMES = {
   classic: { label: 'Clásico', color: '#F7F3EC' },
-  cocina:  { label: 'Cocina',  color: '#FAF5EC' },
-  mercado: { label: 'Mercado', color: '#FFF8EC' }
+  mercado: { label: 'Mercado', color: '#FFF8EC' },
+  nocturno:{ label: 'Nocturno', color: '#1A1410' }
 };
 
 // ── API helper ───────────────────────────────────────────────
@@ -196,7 +196,7 @@ async function loadInicio() {
       <div class="row">
         <div class="chk chk-sq ${t.done?'done':''}" onclick="toggleTask(${t.id},${!t.done},true)"></div>
         <span class="row-text ${t.done?'done':''}">${esc(t.title)}</span>
-        <span class="row-sub">${t.due_time?t.due_time.slice(0,5):'hoy'}</span>
+        <span class="row-sub">${t.due_time?fmtTime(t.due_time):'hoy'}</span>
       </div>`).join('')
     + (items.length>4 ? `<div style="text-align:center;padding:.625rem 0 .25rem;font-size:.8rem;color:var(--ink3);font-style:italic;cursor:pointer" onclick="goTab('pendientes')">+${items.length-4} más →</div>` : '');
   } catch(e) { console.error(e); }
@@ -226,21 +226,44 @@ async function loadTasks() {
 
 function renderTasks(items) {
   const el = document.getElementById('tasks-list');
+  const pending = items.filter(t => !t.done);
+  const done    = items.filter(t =>  t.done);
+
   if (!items.length) {
     el.innerHTML = USER.guest
       ? '<div class="empty"><h3>Sin pendientes</h3><p>Crea una cuenta en Ajustes para guardar tus pendientes</p></div>'
       : '<div class="empty"><h3>Sin pendientes</h3><p>Dile a Casita "recuérdame X" o agrégalo manualmente</p></div>';
     return;
   }
-  el.innerHTML = items.map(t=>`
+
+  const taskRow = t => `
     <div class="row" id="task-${t.id}">
       <div class="chk chk-sq ${t.done?'done':''}" onclick="toggleTask(${t.id},${!t.done},false)"></div>
       <div style="flex:1">
         <div class="row-text ${t.done?'done':''}">${esc(t.title)}</div>
-        ${t.due_date?`<div class="row-sub">${fmtDate(t.due_date)}${t.due_time?' · '+t.due_time.slice(0,5):''}</div>`:''}
+        ${(t.due_date||t.due_time)?`<div class="row-sub">${t.due_time?fmtTime(t.due_time):''}${t.due_time&&t.due_date?' · ':''}${t.due_date?fmtDate(t.due_date):''}</div>`:''}
       </div>
       <button class="del-btn" onclick="deleteTask(${t.id})">×</button>
-    </div>`).join('');
+    </div>`;
+
+  let html = '';
+
+  if (pending.length) {
+    html += `<div class="card" style="padding:.5rem 1.1rem">${pending.map(taskRow).join('')}</div>`;
+  } else {
+    html += `<div class="card" style="padding:.5rem 1.1rem"><div class="empty" style="padding:1.25rem 0"><p>Todo listo por hoy ✓</p></div></div>`;
+  }
+
+  if (done.length) {
+    html += `
+      <button class="done-toggle" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.done-toggle-arrow').style.transform=this.nextElementSibling.classList.contains('hidden')?'':'rotate(90deg)'">
+        <span style="font-size:.75rem;font-weight:600;color:var(--ink3)">hecho (${done.length})</span>
+        <svg class="done-toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:13px;height:13px;color:var(--ink3);transition:transform .2s;transform:rotate(90deg)"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="card" style="padding:.5rem 1.1rem">${done.map(taskRow).join('')}</div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 async function toggleTask(id, done, isInicio) {
@@ -270,6 +293,16 @@ async function addTaskManual() {
 }
 
 // ── MANDADO / DESPENSA ───────────────────────────────────────
+const PANTRY_CATEGORIES = {carnes:'🥩 carnes',verduras:'🥬 verduras',frutas:'🍎 frutas',lacteos:'🥛 lácteos',abarrotes:'🫙 abarrotes',pan:'🍞 pan',limpieza:'🧹 limpieza',otros:'📦 otros'};
+const PANTRY_LEVELS = ['lleno','suficiente','poco','agotado'];
+const PANTRY_LEVEL_META = {
+  lleno:{label:'🟢 lleno',dot:'dot-full',select:'level-full'},
+  suficiente:{label:'🟠 suficiente',dot:'dot-enough',select:'level-enough'},
+  poco:{label:'🟡 poco',dot:'dot-low',select:'level-low'},
+  agotado:{label:'🔴 agotado',dot:'dot-out',select:'level-out'}
+};
+let pantryGroupBy = 'category';
+
 async function loadMandado() {
   await Promise.all([loadShoppingList(), loadPantry()]);
 }
@@ -348,29 +381,87 @@ function renderPantry(items) {
     el.innerHTML = '<div class="empty"><h3>Despensa vacía</h3><p>Escanea un ticket o dile a Casita qué compraste</p></div>';
     return;
   }
-  const cats = {carnes:'🥩 carnes',verduras:'🥬 verduras',frutas:'🍎 frutas',lacteos:'🥛 lácteos',abarrotes:'🫙 abarrotes',pan:'🍞 pan',limpieza:'🧹 limpieza',otros:'📦 otros'};
+  const groups = pantryGroupBy==='status' ? groupPantryByStatus(items) : groupPantryByCategory(items);
+  let html='';
+  for (const group of groups) {
+    if (!group.items.length) continue;
+    html += `<div style="margin-bottom:.75rem">
+      <div style="font-family:var(--serif);font-style:italic;font-size:.8rem;color:var(--ink3);padding:.5rem 0 .25rem">${group.label}</div>
+      <div class="card pantry-card" style="padding:.25rem 1.1rem">
+        ${group.items.map(renderPantryRow).join('')}
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function groupPantryByCategory(items) {
   const bycat = {};
   for (const it of items) {
     const c = it.category||'otros';
     if (!bycat[c]) bycat[c]=[];
     bycat[c].push(it);
   }
-  let html='';
-  for (const [cat, label] of Object.entries(cats)) {
-    if (!bycat[cat]) continue;
-    html += `<div style="margin-bottom:.75rem">
-      <div style="font-family:var(--serif);font-style:italic;font-size:.8rem;color:var(--ink3);padding:.5rem 0 .25rem">${label}</div>
-      <div class="card" style="padding:.25rem 1.1rem">
-        ${bycat[cat].map(it=>`
-          <div class="row">
-            <div class="dot ${it.level==='agotado'?'dot-out':it.level==='poco'?'dot-low':'dot-ok'}"></div>
-            <span class="row-text">${esc(it.name)}</span>
-            <span class="pill ${it.level==='agotado'?'pill-r':it.level==='poco'?'pill-y':'pill-g'}">${it.level}</span>
-          </div>`).join('')}
-      </div>
-    </div>`;
+  return Object.entries(PANTRY_CATEGORIES).map(([key,label])=>({label,items:bycat[key]||[]}));
+}
+
+function groupPantryByStatus(items) {
+  const bylevel = {};
+  for (const it of items) {
+    const level = PANTRY_LEVELS.includes(it.level) ? it.level : 'suficiente';
+    if (!bylevel[level]) bylevel[level]=[];
+    bylevel[level].push(it);
   }
-  el.innerHTML = html;
+  return PANTRY_LEVELS.map(level=>({label:PANTRY_LEVEL_META[level].label,items:bylevel[level]||[]}));
+}
+
+function renderPantryRow(it) {
+  const meta = PANTRY_LEVEL_META[it.level] || PANTRY_LEVEL_META.suficiente;
+  return `
+    <div class="row pantry-row" id="pantry-${it.id}">
+      <div class="dot ${meta.dot}"></div>
+      <span class="row-text">${esc(it.name)}</span>
+      <select class="level-select ${meta.select}" onchange="updatePantryLevel(${it.id},this.value)">
+        ${PANTRY_LEVELS.map(level=>`<option value="${level}" ${it.level===level?'selected':''}>${level}</option>`).join('')}
+      </select>
+      <button class="del-btn" onclick="deletePantry(${it.id})" aria-label="Eliminar ${esc(it.name)}">×</button>
+    </div>`;
+}
+
+function setPantryGroup(group, btn) {
+  pantryGroupBy = group==='status' ? 'status' : 'category';
+  document.querySelectorAll('.pantry-group-seg .seg-btn').forEach(b=>b.classList.remove('on'));
+  btn?.classList.add('on');
+  loadPantry();
+}
+
+async function updatePantryLevel(id, level) {
+  try {
+    await api('pantry',{method:'POST',body:{action:'update',id,level}});
+    loadPantry();
+  } catch(e) { toast(e.message); }
+}
+
+async function deletePantry(id) {
+  try {
+    await api('pantry',{method:'POST',body:{action:'delete',id}});
+    loadPantry();
+  } catch(e) { toast(e.message); }
+}
+
+async function addPantryManual() {
+  if (USER.guest) { toast('Crea una cuenta en Ajustes para usar la despensa'); return; }
+  const inp = document.getElementById('pantry-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  const category = document.getElementById('pantry-cat').value;
+  const level = document.getElementById('pantry-level').value;
+  inp.value = '';
+  try {
+    await api('pantry',{method:'POST',body:{action:'add',name,category,level}});
+    loadPantry();
+    toast('Agregado a despensa ✓');
+  } catch(e) { toast(e.message); }
 }
 
 // ── RECETAS ──────────────────────────────────────────────────
@@ -874,6 +965,7 @@ function loadSettings() {
   document.getElementById('s-household').value = USER.household_size || 4;
   document.getElementById('s-city').value = USER.city || 'CDMX';
   syncThemePicker();
+  loadMemory();
   renderAccountSection();
 }
 
@@ -896,6 +988,59 @@ function syncThemePicker(theme=S.g('theme','classic')) {
   document.querySelectorAll('[data-theme-choice]').forEach(btn=>{
     btn.classList.toggle('on', btn.dataset.themeChoice===theme);
   });
+}
+
+async function loadMemory() {
+  const el = document.getElementById('memory-list');
+  if (!el) return;
+  if (USER.guest) {
+    el.innerHTML = '<div class="empty" style="padding:1.25rem 0"><p>Crea una cuenta para que Casita recuerde tus preferencias</p></div>';
+    return;
+  }
+  try {
+    const res = await apiAuth('memory');
+    renderMemory(res?.items||[]);
+  } catch(e) {
+    el.innerHTML = `<div class="empty" style="padding:1.25rem 0"><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+function renderMemory(items) {
+  const el = document.getElementById('memory-list');
+  if (!items.length) {
+    el.innerHTML = '<div class="empty" style="padding:1.25rem 0"><p>Cuando le cuentes gustos, palabras o rutinas, Casita podrá recordarlas aquí</p></div>';
+    return;
+  }
+  el.innerHTML = items.map(m=>`
+    <div class="row">
+      <div style="flex:1;min-width:0">
+        <div class="memory-type">${esc(memoryTypeLabel(m.type))} · ${esc(m.key)}</div>
+        <div class="memory-value">${esc(m.value)}</div>
+      </div>
+      <button class="del-btn" onclick="deleteMemory(${m.id})" aria-label="Borrar recuerdo">×</button>
+    </div>`).join('');
+}
+
+function memoryTypeLabel(type) {
+  return ({
+    vocabulario:'vocabulario',
+    tono:'tono',
+    comida_gusta:'le gusta',
+    comida_evitar:'evitar',
+    alergia:'alergia',
+    compras:'compras',
+    rutina:'rutina',
+    hogar:'hogar',
+    otro:'nota'
+  })[type] || type || 'nota';
+}
+
+async function deleteMemory(id) {
+  try {
+    await api('memory',{method:'POST',body:{action:'delete',id}});
+    loadMemory();
+    toast('Recuerdo borrado ✓');
+  } catch(e) { toast(e.message); }
 }
 
 function renderAccountSection() {
@@ -959,10 +1104,17 @@ function esc(s) {
 
 function fmtDate(s) {
   if (!s) return '';
-  const months=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  const d = new Date(s+'T12:00:00');
-  if (isNaN(d.getTime())) return s;
-  return `${d.getDate()} ${months[d.getMonth()]}`;
+  const clean = s.includes('T') ? s.split('T')[0] : s;
+  const [y, m, d] = clean.split('-').map(Number);
+  if (!y || !m || !d) return s;
+  return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${String(y).slice(2)}`;
+}
+
+function fmtTime(s) {
+  if (!s) return '';
+  // accepts "HH:MM:SS", "HH:MM", or full ISO
+  const t = s.includes('T') ? s.split('T')[1] : s;
+  return t.slice(0,5);
 }
 
 function toast(msg) {

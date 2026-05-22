@@ -86,3 +86,17 @@ CREATE TABLE IF NOT EXISTS chat_history (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_chat ON chat_history(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_memory (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  confidence NUMERIC DEFAULT 0.8,
+  source TEXT DEFAULT 'chat',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, type, key)
+);
+CREATE INDEX IF NOT EXISTS idx_user_memory ON user_memory(user_id, type);

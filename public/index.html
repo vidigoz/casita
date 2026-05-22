@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/theme-cocina.css">
 <link rel="stylesheet" href="/theme-mercado.css">
+<link rel="stylesheet" href="/theme-nocturno.css">
 </head>
 <body>
 
@@ -65,7 +65,7 @@
     <!-- ── PENDIENTES ── -->
     <div class="page" id="pg-pendientes">
       <div class="slabel">pendientes</div>
-      <div class="card" id="tasks-list" style="padding:.5rem 1.1rem">
+      <div id="tasks-list" style="display:flex;flex-direction:column;gap:.75rem">
         <div class="empty"><h3>Sin pendientes</h3><p>Dile a Casita "recuérdame X" y aparecerá aquí</p></div>
       </div>
       <div class="input-row" style="padding-top:.875rem;border-top:none;margin-top:-.25rem">
@@ -104,8 +104,36 @@
       <!-- despensa -->
       <div id="m-despensa" class="hidden">
         <div class="slabel">lo que hay en casa</div>
+        <div class="seg pantry-group-seg">
+          <button class="seg-btn on" onclick="setPantryGroup('category',this)">categorías</button>
+          <button class="seg-btn" onclick="setPantryGroup('status',this)">estado</button>
+        </div>
         <div id="pantry-list">
           <div class="empty"><h3>Despensa vacía</h3><p>Escanea un ticket o dile a Casita qué compraste</p></div>
+        </div>
+        <div class="pantry-add">
+          <input id="pantry-input" class="ibox" placeholder='"arroz, leche, jitomate..."' onkeydown="if(event.key==='Enter')addPantryManual()">
+          <div class="pantry-add-controls">
+            <select id="pantry-cat" class="sfield pantry-select" aria-label="Categoría">
+              <option value="otros">otros</option>
+              <option value="abarrotes">abarrotes</option>
+              <option value="verduras">verduras</option>
+              <option value="frutas">frutas</option>
+              <option value="carnes">carnes</option>
+              <option value="lacteos">lácteos</option>
+              <option value="pan">pan</option>
+              <option value="limpieza">limpieza</option>
+            </select>
+            <select id="pantry-level" class="sfield pantry-select" aria-label="Estado">
+              <option value="suficiente">suficiente</option>
+              <option value="lleno">lleno</option>
+              <option value="poco">poco</option>
+              <option value="agotado">agotado</option>
+            </select>
+            <button class="icon-btn" onclick="addPantryManual()" aria-label="Agregar a despensa">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -185,9 +213,13 @@
       <div class="card">
         <div class="seg theme-seg" id="theme-picker" role="group" aria-label="Tema visual">
           <button class="seg-btn theme-btn" data-theme-choice="classic" onclick="setTheme('classic')" type="button"><span class="theme-dot theme-dot-classic"></span>Clásico</button>
-          <button class="seg-btn theme-btn" data-theme-choice="cocina" onclick="setTheme('cocina')" type="button"><span class="theme-dot theme-dot-cocina"></span>Cocina</button>
           <button class="seg-btn theme-btn" data-theme-choice="mercado" onclick="setTheme('mercado')" type="button"><span class="theme-dot theme-dot-mercado"></span>Mercado</button>
+          <button class="seg-btn theme-btn" data-theme-choice="nocturno" onclick="setTheme('nocturno')" type="button"><span class="theme-dot theme-dot-nocturno"></span>Nocturno</button>
         </div>
+      </div>
+      <div class="slabel" style="margin-top:.5rem">memoria de Casita</div>
+      <div class="card" id="memory-list" style="padding:.5rem 1.1rem">
+        <div class="empty"><p>Cargando recuerdos...</p></div>
       </div>
       <div class="slabel" style="margin-top:.5rem">cuenta</div>
       <div class="card" id="s-account-wrap"></div>

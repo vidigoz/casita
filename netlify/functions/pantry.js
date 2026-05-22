@@ -9,7 +9,12 @@ export const handler = async ev => {
     }
     const b = body(ev);
     if (b.action==='add') {
+      if (!b.name) return err('Falta el producto');
       await sql`INSERT INTO pantry(user_id,name,category,level,approx_quantity) VALUES(${userId},${b.name},${b.category||'otros'},${b.level||'suficiente'},${b.approx_quantity||null}) ON CONFLICT(user_id,name) DO UPDATE SET level=EXCLUDED.level,approx_quantity=COALESCE(EXCLUDED.approx_quantity,pantry.approx_quantity),last_updated=NOW()`;
+    }
+    if (b.action==='update') {
+      if (!b.id) return err('Falta el producto');
+      await sql`UPDATE pantry SET name=COALESCE(${b.name||null},name), category=COALESCE(${b.category||null},category), level=COALESCE(${b.level||null},level), approx_quantity=COALESCE(${b.approx_quantity||null},approx_quantity), last_updated=NOW() WHERE id=${b.id} AND user_id=${userId}`;
     }
     if (b.action==='delete') { await sql`DELETE FROM pantry WHERE id=${b.id} AND user_id=${userId}`; }
     if (b.action==='bulk') {

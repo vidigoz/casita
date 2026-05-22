@@ -10,6 +10,14 @@ responde amablemente: "Eso no lo sé, pero en lo que tiene que ver con tu hogar 
 PERSONALIDAD: Amiga de confianza. Directa, cálida, sin rodeos. Máximo 3 líneas.
 Hablas natural: "jitomate", "ahorita", "el mandado", "¿cuántos eran?"
 
+MEMORIA: Usa guardar_memoria() cuando la usuaria comparta algo estable y útil para el hogar:
+- vocabulario propio ("lonche" = comida para llevar)
+- tono preferido ("háblame corto", "sin emojis")
+- gustos/disgustos de comida, alergias o cosas a evitar
+- tiendas frecuentes, rutinas del hogar, horarios o hábitos de compra
+No guardes contraseñas, datos bancarios, documentos, direcciones exactas, temas políticos/religiosos ni datos sensibles innecesarios.
+Si una preferencia parece temporal o no estás segura, pregunta antes de guardarla.
+
 HERRAMIENTAS: Úsalas cuando aplique — no esperes que la usuaria sea explícita.
 - "hice X para Y" → descontar_despensa()
 - "se acabó X" / "ya no hay X" → actualizar_despensa(nivel=agotado)
@@ -17,7 +25,8 @@ HERRAMIENTAS: Úsalas cuando aplique — no esperes que la usuaria sea explícit
 - "compré X" / "ya hay X" → actualizar_despensa(nivel=lleno)
 - "necesito X" / "falta X" / "agrega X al mandado" → agregar_mandado()
 - "recuérdame X" / "tengo cita" / "mañana hay" → agregar_tarea()
-- "quiero organizar X" / "voy a hacer una fiesta" / "empecé un negocio" → crear_proyecto()`;
+- "quiero organizar X" / "voy a hacer una fiesta" / "empecé un negocio" → crear_proyecto()
+- "siempre compro en X" / "no me gusta X" / "dile X a Y" / "háblame de X forma" → guardar_memoria()`;
 
 const TOOLS = [
   {
@@ -70,8 +79,33 @@ const TOOLS = [
       meta_total:{type:'number',description:'Para tracker_dinero: monto total'},
       descripcion:{type:'string'}
     }}
+  },
+  {
+    name:'guardar_memoria',
+    description:'Guarda una preferencia estable, vocabulario o dato útil del hogar para personalizar futuras respuestas.',
+    input_schema:{type:'object',required:['tipo','clave','valor'],properties:{
+      tipo:{type:'string',enum:['vocabulario','tono','comida_gusta','comida_evitar','alergia','compras','rutina','hogar','otro']},
+      clave:{type:'string',description:'Nombre corto de la memoria, por ejemplo cilantro, tienda_frecuente, lonche'},
+      valor:{type:'string',description:'Qué debe recordar Casita'},
+      confianza:{type:'number',description:'0 a 1, qué tan segura es la memoria'}
+    }}
   }
 ];
+
+function memoryLine(m) {
+  const labels = {
+    vocabulario:'vocabulario',
+    tono:'tono',
+    comida_gusta:'le gusta',
+    comida_evitar:'evitar',
+    alergia:'alergia',
+    compras:'compras',
+    rutina:'rutina',
+    hogar:'hogar',
+    otro:'nota'
+  };
+  return `- ${labels[m.type]||m.type}: ${m.key} = ${m.value}`;
+}
 
 async function runTool(name, input, userId) {
   if (name==='actualizar_despensa') {
@@ -106,6 +140,26 @@ async function runTool(name, input, userId) {
     await sql`INSERT INTO projects(user_id,title,type,data) VALUES(${userId},${input.titulo},${input.tipo},${JSON.stringify(data)})`;
     return {ok:true};
   }
+  if (name==='guardar_memoria') {
+    const type = input.tipo || 'otro';
+    const key = (input.clave||'').toLowerCase().trim();
+    const value = (input.valor||'').trim();
+    if (!key || !value) return {ok:false,error:'missing memory'};
+    try {
+      await sql`
+        INSERT INTO user_memory(user_id,type,key,value,confidence,source)
+        VALUES(${userId},${type},${key},${value},${input.confianza||0.8},'chat')
+        ON CONFLICT(user_id,type,key) DO UPDATE SET
+          value=EXCLUDED.value,
+          confidence=EXCLUDED.confidence,
+          source='chat',
+          updated_at=NOW()`;
+      return {ok:true};
+    } catch (e) {
+      console.warn('memory save skipped:', e.message);
+      return {ok:false,error:'memory unavailable'};
+    }
+  }
   return {ok:false,error:'unknown tool'};
 }
 
@@ -122,8 +176,15 @@ export const handler = async ev => {
   try {
     const client = new Anthropic({apiKey});
     const user = await sql`SELECT casita_name,household_size,city FROM users WHERE id=${userId}`;
+    let memories = [];
+    try {
+      memories = await sql`SELECT type,key,value FROM user_memory WHERE user_id=${userId} ORDER BY updated_at DESC LIMIT 30`;
+    } catch (e) {
+      console.warn('memory load skipped:', e.message);
+    }
     const u = user[0]||{};
-    const system = `${SYSTEM}\n\nUSUARIA: ${u.casita_name||'—'} · ${u.household_size||4} personas · ${u.city||'CDMX'} · fecha: ${new Date().toISOString().split('T')[0]}`;
+    const memoryText = memories.length ? `\n\nMEMORIA DE ESTA USUARIA:\n${memories.map(memoryLine).join('\n')}` : '';
+    const system = `${SYSTEM}\n\nUSUARIA: ${u.casita_name||'—'} · ${u.household_size||4} personas · ${u.city||'CDMX'} · fecha: ${new Date().toISOString().split('T')[0]}${memoryText}`;
 
     const msgs = [...history.map(h=>({role:h.role,content:h.content})), {role:'user',content:message}];
     await sql`INSERT INTO chat_history(user_id,role,content) VALUES(${userId},'user',${message})`;
