@@ -16,6 +16,8 @@ let recipeOffset = 0;
 let currentRecipes = [];
 let voiceRecognition = null;
 let isListening = false;
+let voiceStopRequested = false;
+let voiceSilenceTimer = null;
 
 // ── API helper ───────────────────────────────────────────────
 async function api(path, opts={}) {
@@ -689,20 +691,55 @@ function setupVoice() {
   voiceRecognition = new SR();
   voiceRecognition.lang = 'es-MX';
   voiceRecognition.continuous = false;
-  voiceRecognition.interimResults = false;
-  voiceRecognition.onresult = e => {
-    const t = e.results[0][0].transcript;
-    document.getElementById('chat-input').value = t;
-    sendMsg();
+  voiceRecognition.interimResults = true;
+  voiceRecognition.onstart = () => {
+    isListening = true;
+    setVoiceButtons(true);
+    clearVoiceSilenceTimer();
+    voiceSilenceTimer = setTimeout(()=>{
+      if (!isListening) return;
+      toast('No escuché nada. Revisa permiso de micrófono.');
+      stopVoice(true);
+    }, 12000);
   };
-  voiceRecognition.onerror = e => { stopVoice(); if (e.error!=='no-speech') toast('Error de voz: '+e.error); };
-  voiceRecognition.onend = stopVoice;
+  voiceRecognition.onaudiostart = () => {
+    isListening = true;
+    setVoiceButtons(true);
+  };
+  voiceRecognition.onspeechstart = clearVoiceSilenceTimer;
+  voiceRecognition.onresult = e => {
+    clearVoiceSilenceTimer();
+    let finalText = '';
+    let interimText = '';
+    for (let i=e.resultIndex; i<e.results.length; i++) {
+      const text = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += text;
+      else interimText += text;
+    }
+    const inp = document.getElementById('chat-input');
+    if (interimText) inp.value = interimText.trim();
+    if (finalText.trim()) {
+      inp.value = finalText.trim();
+      sendMsg();
+    }
+  };
+  voiceRecognition.onerror = e => {
+    clearVoiceSilenceTimer();
+    stopVoice(false);
+    if (voiceStopRequested || e.error==='aborted') return;
+    toast(voiceErrorMessage(e.error));
+  };
+  voiceRecognition.onend = () => stopVoice(false);
+  voiceRecognition.onnomatch = () => {
+    clearVoiceSilenceTimer();
+    toast('No entendí eso. Intenta hablar un poco más cerca.');
+  };
 }
 
 function toggleVoice() {
   if (!voiceRecognition) { toast('Tu navegador no soporta voz'); return; }
   if (isListening) {
-    voiceRecognition.stop();
+    stopVoice(true);
   } else {
     startVoice();
   }
@@ -720,15 +757,39 @@ function startVoice() {
     return;
   }
   try {
+    voiceStopRequested = false;
     voiceRecognition.start();
     isListening = true;
     setVoiceButtons(true);
   } catch(e) { toast('No pude iniciar el micrófono'); }
 }
 
-function stopVoice() {
+function stopVoice(forceAbort=false) {
+  clearVoiceSilenceTimer();
+  if (forceAbort && voiceRecognition) {
+    voiceStopRequested = true;
+    try { voiceRecognition.abort(); } catch {}
+  }
   isListening = false;
   setVoiceButtons(false);
+}
+
+function clearVoiceSilenceTimer() {
+  if (voiceSilenceTimer) clearTimeout(voiceSilenceTimer);
+  voiceSilenceTimer = null;
+}
+
+function voiceErrorMessage(error) {
+  const msgs = {
+    'not-allowed':'Permite el micrófono en Chrome para usar la voz.',
+    'service-not-allowed':'Chrome bloqueó el servicio de voz. Revisa permisos del sitio.',
+    'audio-capture':'No encontré micrófono disponible.',
+    'network':'No pude conectar el reconocimiento de voz.',
+    'no-speech':'No escuché nada. Intenta de nuevo.',
+    'language-not-supported':'Tu navegador no soporta voz en español.',
+    'bad-grammar':'No pude interpretar el audio.'
+  };
+  return msgs[error] || `Error de voz: ${error}`;
 }
 
 function setVoiceButtons(listening) {
