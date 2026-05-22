@@ -333,6 +333,33 @@ function renderShopping(items) {
     </div>`).join('');
 }
 
+function guessCategory(name) {
+  const n = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const rules = [
+    ['frutas',    ['limon','lemon','lima','naranja','toronja','mandarina','manzana','pera','uva','platano','mango','melon','sandia','fresa','frambuesa','zarzamora','durazno','chabacano','ciruela','kiwi','papaya','guayaba','tejocote','pitaya','pitahaya','tamarindo','guanabana','mamey','zapote','nance','fruta','granada','higo','dátil','datil','coco','maracuya','lichi','mora']],
+    ['verduras',  ['tomate','jitomate','cebolla','ajo','chile','jalapeno','serrano','habanero','poblano','chipotle','cilantro','epazote','hierbabuena','lechuga','espinaca','zanahoria','papa','betabel','calabaza','chayote','nopal','aguacate','brocoli','coliflor','champiñon','hongo','apio','pepino','elote','maiz','ejote','haba','chicharo','verdura','acelga','quelite','poro','rabano','nabo','alcachofa','esparragos','esparrago','jicama','camote','yuca','pimiento','perejil','romero','tomillo','laurel','albahaca']],
+    ['carnes',    ['carne','pollo','res','cerdo','puerco','bistec','milanesa','chorizo','jamon','salchicha','tocino','pavo','salmon','sardina','camaron','langosta','pulpo','calamar','pescado','costilla','molida','barbacoa','carnitas','longaniza','chicharron','machaca','cecina','birria','tripa','menudo','cabeza','buche','cuete','filete','lomo','chuleta','pierna','muslo','alita','pechuga','higado','rinon','mortadela','peperoni','pepperoni','atun','cangrejo']],
+    ['lacteos',   ['leche','yogur','yoghurt','queso','crema','mantequilla','margarina','jocoque','nata','cajeta','requesón','requeson','lacteo','manchego','oaxaca','panela','cotija','chihuahua','gouda','mozzarella','amarillo','blanco','fresco','doble crema','media crema','evaporada','condensada','búfala','bufala']],
+    ['huevo',     ['huevo','huevos']],
+    ['pan',       ['pan','tortilla','bolillo','baguette','pita','galleta','cereal','avena','granola','palomita','tostada','waffle','hotcake','pasta','fideo','spaghetti','espagueti','macarron','lasaña','lasagna','penne','rigatoni','couscous','quinoa','amaranto','integral','salvado','centeno','maíz','maiz tostado','crutones','pan molido','breadcrumbs','croissant','dona','cuernito','conchas','telera','chapata']],
+    ['abarrotes', ['aceite','sal','azucar','harina','arroz','frijol','lenteja','garbanzo','sopa','caldo','consomé','consome','salsa','ketchup','mayonesa','mostaza','vinagre','pimienta','oregano','comino','canela','vainilla','polvo','bicarbonato','cafe','te','chocolate','cocoa','miel','mermelada','atole','agua','refresco','jugo','cerveza','vino','tequila','mezcal','ron','whisky','vodka','refresco','soda','lata','conserva','enlatado','atun lata','sardina lata','alubia','pepita','cacahuate','nuez','almendra','pistache','chía','chia','linaza','maple','agave','stevia','splenda','endulzante','catsup','aderezo','ranch','buffalo','sriracha','mole','adobo','recado','sazon','maggi','knorr','maizena','fecula','gelatina','jello','flan','pudín','pudin','merengue','chantilly']],
+    ['limpieza',  ['jabon','detergente','cloro','suavitel','suavizante','ariel','fabuloso','pinol','ajax','lysol','escoba','trapeador','esponja','servilleta','papel','pañal','panal','toalla','kleenex','sanitario','shampoo','acondicionador','desodorante','dental','enjuague','cepillo','rasuradora','rastrillo','afeitadora','perfume','colonia','talco','crema corporal','bloqueador','protector','tampón','tampon','toalla femenina','pañuelo','ziploc','bolsa basura','bolsa plastico','film','aluminio','windex','pledge','mr clean','comet']],
+  ];
+  for (const [cat, words] of rules) {
+    if (words.some(w => n.includes(w))) return cat;
+  }
+  return null;
+}
+
+async function resolveCategory(name) {
+  const local = guessCategory(name);
+  if (local) return local;
+  try {
+    const d = await api('categorize',{method:'POST',body:{name}});
+    return d.category || 'otros';
+  } catch(e) { return 'otros'; }
+}
+
 async function toggleShop(id, done) {
   try {
     await api('shopping',{method:'POST',body:{action:'toggle',id,done}});
@@ -341,7 +368,8 @@ async function toggleShop(id, done) {
       const {items} = await api('shopping');
       const item = items.find(i=>i.id===id);
       if (item) {
-        await api('pantry',{method:'POST',body:{action:'add',name:item.name,level:'lleno',category:item.category||'otros'}});
+        const category = item.category && item.category!=='otros' ? item.category : await resolveCategory(item.name);
+        await api('pantry',{method:'POST',body:{action:'add',name:item.name,level:'lleno',category}});
       }
     }
     loadMandado();
@@ -362,7 +390,8 @@ async function addShopManual() {
   if (!v) return;
   inp.value = '';
   try {
-    await api('shopping',{method:'POST',body:{action:'add',name:v,source:'user'}});
+    const category = await resolveCategory(v);
+    await api('shopping',{method:'POST',body:{action:'add',name:v,category,source:'user'}});
     loadShoppingList();
   } catch(e) { toast(e.message); }
 }
