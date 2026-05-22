@@ -5,7 +5,7 @@ export const handler = async ev => {
   if (ev.httpMethod==='OPTIONS') return cors();
   if (ev.httpMethod!=='POST') return err('Method not allowed',405);
   const userId = uid(ev); if (!userId) return err('No autenticado',401);
-  const {pantry=[], offset=0, single_meal=null} = body(ev);
+  const {pantry=[], offset=0, single_meal=null, household_size=4} = body(ev);
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return err('Sin API key',500);
 
@@ -18,6 +18,7 @@ export const handler = async ev => {
 Ingredientes en despensa: ${ingredientes}
 
 Genera exactamente 1 receta de tipo "${single_meal}" que se pueda hacer principalmente con estos ingredientes. Debe ser diferente a recetas comunes, varía con offset ${offset}.
+La receta es para ${household_size} persona${household_size===1?'':'s'}.
 
 Responde SOLO con JSON válido, sin markdown, sin texto extra:
 {
@@ -28,7 +29,7 @@ Responde SOLO con JSON válido, sin markdown, sin texto extra:
       "meal_type": "${single_meal}",
       "cuisine": "mexicana|italiana|asiatica|americana|española|otra",
       "time": "25 min",
-      "servings": 4,
+      "servings": ${household_size},
       "available": true,
       "ingredients": [
         {"name": "ingrediente", "amount": "2 tazas", "status": "ok|low|missing"}
@@ -53,6 +54,7 @@ Genera exactamente 3 recetas diferentes que se puedan hacer principalmente con e
 1 cena
 
 Pueden ser de cualquier cocina del mundo (mexicana, italiana, asiática, etc.), pero deben sentirse adecuadas para ese momento del día.
+Las recetas son para ${household_size} persona${household_size===1?'':'s'} — ajusta cantidades e ingredientes en consecuencia.
 
 Responde SOLO con JSON válido, sin markdown, sin texto extra:
 {
@@ -63,7 +65,7 @@ Responde SOLO con JSON válido, sin markdown, sin texto extra:
       "meal_type": "desayuno|comida|cena",
       "cuisine": "mexicana|italiana|asiatica|americana|española|otra",
       "time": "25 min",
-      "servings": 4,
+      "servings": ${household_size},
       "available": true,
       "ingredients": [
         {"name": "ingrediente", "amount": "2 tazas", "status": "ok|low|missing"}

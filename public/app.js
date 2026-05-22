@@ -110,8 +110,67 @@ function showAccountErr(msg) {
 }
 
 // ── Launch ───────────────────────────────────────────────────
+function initFabDrag() {
+  const fab = document.getElementById('fab');
+  const container = document.getElementById('body'); // scrollable area
+  let dragging = false, startY = 0, startTop = 0, didDrag = false;
+
+  function getContainer() { return fab.parentElement; }
+
+  function applyTop(top) {
+    const parent = getContainer();
+    const maxTop = parent.clientHeight - fab.offsetHeight - 8;
+    const minTop = 8;
+    const clamped = Math.max(minTop, Math.min(maxTop, top));
+    fab.style.bottom = 'auto';
+    fab.style.top = clamped + 'px';
+    return clamped;
+  }
+
+  function loadSaved() {
+    const saved = localStorage.getItem('fab_top');
+    if (saved !== null) applyTop(parseInt(saved));
+  }
+
+  fab.addEventListener('touchstart', e => {
+    dragging = true; didDrag = false;
+    startY = e.touches[0].clientY;
+    const rect = fab.getBoundingClientRect();
+    const parentRect = fab.parentElement.getBoundingClientRect();
+    startTop = rect.top - parentRect.top;
+    fab.classList.add('dragging');
+    e.stopPropagation();
+  }, {passive:true});
+
+  fab.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > 4) didDrag = true;
+    applyTop(startTop + dy);
+    e.stopPropagation();
+  }, {passive:true});
+
+  fab.addEventListener('touchend', e => {
+    if (!dragging) return;
+    dragging = false;
+    fab.classList.remove('dragging');
+    if (didDrag) {
+      const rect = fab.getBoundingClientRect();
+      const parentRect = fab.parentElement.getBoundingClientRect();
+      const top = applyTop(rect.top - parentRect.top);
+      localStorage.setItem('fab_top', top);
+      // evitar que el touchend dispare el click
+      e.stopPropagation();
+      fab.addEventListener('click', e => e.stopPropagation(), {once:true, capture:true});
+    }
+  }, {passive:true});
+
+  loadSaved();
+}
+
 function launchApp() {
   setupVoice();
+  initFabDrag();
   setGreeting();
   loadInicio();
   if (USER.guest) {
@@ -501,7 +560,7 @@ async function loadRecipes(next=false) {
   try {
     const pantryRes = USER.guest ? null : await api('pantry').catch(()=>null);
     const pantry = pantryRes?.items || [];
-    const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset}});
+    const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset,household_size:USER.household_size||4}});
     currentRecipes = d.recipes || [];
     renderRecipes(currentRecipes);
   } catch(e) {
@@ -583,7 +642,7 @@ async function swipeReplaceRecipe(idx) {
   try {
     const pantryRes = USER.guest ? null : await api('pantry').catch(()=>null);
     const pantry = pantryRes?.items || [];
-    const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset+10+idx,single_meal:mealType}});
+    const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset+10+idx,single_meal:mealType,household_size:USER.household_size||4}});
     const newRecipes = d.recipes || [];
     const match = newRecipes.find(r=>r.meal_type===mealType) || newRecipes[0];
     if (match) {

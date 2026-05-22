@@ -57,6 +57,8 @@ body::before{
   display:flex;align-items:center;justify-content:space-between;
   position:relative;z-index:10;
 }
+.brand-wrap{display:flex;align-items:center;gap:.6rem}
+.brand-logo{height:45px;width:auto;display:block}
 .brand{font-family:var(--serif);font-size:1.5rem;font-weight:500;letter-spacing:-.025em;line-height:1}
 .brand-sub{font-size:.68rem;color:var(--ink3);letter-spacing:.04em;margin-top:1px}
 .hdr-btn{width:36px;height:36px;border-radius:50%;color:var(--ink2);display:flex;align-items:center;justify-content:center;transition:background .15s}
@@ -97,9 +99,12 @@ body::before{
   background:var(--g);color:var(--white);
   display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 16px -2px rgba(74,110,31,.45);
-  transition:all .18s;
+  transition:box-shadow .18s;
+  touch-action:none;
+  cursor:grab;
 }
-.fab:hover{transform:translateY(-2px);box-shadow:0 8px 24px -4px rgba(74,110,31,.5)}
+.fab.dragging{cursor:grabbing;box-shadow:0 8px 28px -4px rgba(74,110,31,.55);transition:none}
+.fab:not(.dragging):hover{box-shadow:0 8px 24px -4px rgba(74,110,31,.5)}
 .fab:active{transform:scale(.95)}
 .fab.listening{background:var(--r);animation:pulseR 1.4s ease-in-out infinite}
 .fab svg{width:20px;height:20px}
