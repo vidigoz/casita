@@ -19,6 +19,12 @@ let isListening = false;
 let voiceStopRequested = false;
 let voiceSilenceTimer = null;
 
+const THEMES = {
+  classic: { label: 'Clásico', color: '#F7F3EC' },
+  cocina:  { label: 'Cocina',  color: '#FAF5EC' },
+  mercado: { label: 'Mercado', color: '#FFF8EC' }
+};
+
 // ── API helper ───────────────────────────────────────────────
 async function api(path, opts={}) {
   const hdrs = {'Content-Type':'application/json'};
@@ -390,10 +396,12 @@ function renderRecipes(recipes) {
     return;
   }
   const emojis = {'mexicana':'🌮','italiana':'🍝','asiatica':'🍜','americana':'🍔','española':'🥘','otra':'🍲'};
+  const mealLabels = {desayuno:'☀️ desayuno',comida:'🍽️ comida',cena:'🌙 cena'};
   el.innerHTML = recipes.map((r,i)=>`
     <div class="recipe-card" onclick="openRecipe(${i})">
       <div class="recipe-img">
         <span>${emojis[r.cuisine]||'🍽️'}</span>
+        <span class="recipe-meal">${mealLabels[r.meal_type]||'🍽️ receta'}</span>
         <span class="recipe-tag" style="position:absolute;top:.75rem;right:.75rem">${r.cuisine||'receta'}</span>
       </div>
       <div class="recipe-body">
@@ -412,8 +420,9 @@ function renderRecipes(recipes) {
 function openRecipe(idx) {
   const r = currentRecipes[idx];
   if (!r) return;
+  const mealLabels = {desayuno:'desayuno',comida:'comida',cena:'cena'};
   document.getElementById('rm-name').textContent = r.name;
-  document.getElementById('rm-meta').textContent = `${r.time||'30 min'} · ${r.servings||4} porciones · ${r.cuisine||'receta'}`;
+  document.getElementById('rm-meta').textContent = `${mealLabels[r.meal_type]||'receta'} · ${r.time||'30 min'} · ${r.servings||4} porciones · ${r.cuisine||'receta'}`;
 
   // Ingredients
   const ingEl = document.getElementById('rm-ingredients');
@@ -864,7 +873,29 @@ function loadSettings() {
   document.getElementById('s-name').value = USER.casita_name || '';
   document.getElementById('s-household').value = USER.household_size || 4;
   document.getElementById('s-city').value = USER.city || 'CDMX';
+  syncThemePicker();
   renderAccountSection();
+}
+
+function setTheme(theme) {
+  applyTheme(theme, true);
+  toast(`Tema ${THEMES[theme]?.label || THEMES.classic.label} aplicado ✓`);
+}
+
+function applyTheme(theme, save=false) {
+  if (!THEMES[theme]) theme = 'classic';
+  if (theme==='classic') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEMES[theme].color);
+  if (save) S.s('theme', theme);
+  syncThemePicker(theme);
+}
+
+function syncThemePicker(theme=S.g('theme','classic')) {
+  if (!THEMES[theme]) theme = 'classic';
+  document.querySelectorAll('[data-theme-choice]').forEach(btn=>{
+    btn.classList.toggle('on', btn.dataset.themeChoice===theme);
+  });
 }
 
 function renderAccountSection() {
@@ -944,6 +975,7 @@ function toast(msg) {
 
 // ── INIT ─────────────────────────────────────────────────────
 function init() {
+  applyTheme(S.g('theme','classic'));
   const saved = S.g('user');
   USER = (saved && (saved.id || saved.guest)) ? saved : makeGuest();
   S.s('user', USER);

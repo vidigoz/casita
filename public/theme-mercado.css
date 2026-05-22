@@ -1,0 +1,198 @@
+/* ─────────────────────────────────────────────────────────────
+   CASITA · TEMA "MERCADO"
+   Bugambilia + papaya + limón · alegre, vibrante, juvenil
+   Aplicar con: <html data-theme="mercado"> o JS:
+     document.documentElement.dataset.theme = 'mercado';
+   ───────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root[data-theme="mercado"] {
+  /* ── Superficies ── */
+  --bg:    #FFF8EC;
+  --bg2:   #FCEDD4;
+  --bg3:   #F7E1B8;
+  --white: #FFFEF7;
+
+  /* ── Tinta ── */
+  --ink:   #2A1A0E;
+  --ink2:  #6B4A3A;
+  --ink3:  #A8856E;
+
+  /* ── Líneas ── */
+  --line:  #F3DDBE;
+  --line2: #E5C597;
+
+  /* ── Acción primaria (bugambilia) — antes verde ── */
+  --g:     #C8347D;
+  --g2:    #D9559A;
+  --g3:    #E879B2;
+  --gbg:   #FBDDEC;
+  --gbg2:  #F4B7D5;
+
+  /* ── Alertas (jamaica) ── */
+  --r:     #8B1F4B;
+  --rbg:   #F7D6DF;
+
+  /* ── Avisos (papaya) ── */
+  --y:     #B86A14;
+  --ybg:   #FDE0C7;
+
+  /* ── Tipografía ── */
+  --serif: "DM Serif Display", Georgia, serif;
+  --sans:  "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  /* ── Sombras (recoloreadas con bugambilia) ── */
+  --sh0: 0 1px 2px rgba(42,26,14,.04);
+  --sh1: 0 2px 8px -2px rgba(42,26,14,.08);
+  --sh2: 0 8px 24px -4px rgba(42,26,14,.12);
+  --shg: 0 6px 20px -4px rgba(200,52,125,.45);
+}
+
+/* ═════ AJUSTES ESPECÍFICOS DEL TEMA ═════════════════════════ */
+
+/* Fondo con manchas de color (bugambilia + limón) */
+:root[data-theme="mercado"] body::before {
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(251,221,236,.65), transparent 50%),
+    radial-gradient(ellipse at 85% 75%, rgba(232,239,196,.55), transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(253,224,199,.45), transparent 55%) !important;
+}
+
+/* Brand color: el logotipo en bugambilia con puntito papaya */
+:root[data-theme="mercado"] .brand {
+  color: var(--g);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+:root[data-theme="mercado"] .brand::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #F08A2C; /* papaya */
+  margin-left: 4px;
+  transform: translateY(-12px);
+}
+
+/* DM Serif tiene peso 400 único; sobrescribimos pesos */
+:root[data-theme="mercado"] .brand,
+:root[data-theme="mercado"] .greeting h1,
+:root[data-theme="mercado"] .recipe-name,
+:root[data-theme="mercado"] .proj-name,
+:root[data-theme="mercado"] .scan-title,
+:root[data-theme="mercado"] .stat-v,
+:root[data-theme="mercado"] .weather-temp {
+  font-weight: 400; /* DM Serif sólo tiene 400 */
+}
+
+/* Greeting con guiño bugambilia */
+:root[data-theme="mercado"] .greeting h1 em {
+  color: var(--g);
+  font-style: italic;
+}
+
+/* Botón mic grande con degradado bugambilia → papaya */
+:root[data-theme="mercado"] .big-mic {
+  background: linear-gradient(135deg, #C8347D 0%, #F08A2C 100%);
+  box-shadow: 0 10px 28px -4px rgba(200,52,125,.5);
+}
+:root[data-theme="mercado"] .big-mic:hover {
+  box-shadow: 0 14px 36px -4px rgba(200,52,125,.6);
+}
+
+/* Floating action button también con degradado */
+:root[data-theme="mercado"] .fab {
+  background: linear-gradient(135deg, #C8347D 0%, #F08A2C 100%);
+  box-shadow: 0 4px 16px -2px rgba(200,52,125,.5);
+}
+
+/* Tarjeta del clima — mantenemos cálida con borde papaya sutil */
+:root[data-theme="mercado"] .weather-card {
+  background: linear-gradient(135deg, rgba(253,224,199,.6), rgba(251,221,236,.4));
+  border-color: var(--line);
+}
+
+/* Tarjetas verdes (cocidas en el código) — re-color a bugambilia */
+:root[data-theme="mercado"] .card-green {
+  background: var(--gbg);
+  border-color: var(--gbg2);
+}
+
+/* Burbujas del chat: AI en bugambilia claro, usuario en bugambilia sólido */
+:root[data-theme="mercado"] .bubble-ai {
+  background: var(--gbg);
+  color: var(--ink);
+}
+:root[data-theme="mercado"] .bubble-user {
+  background: var(--g);
+  color: var(--white);
+}
+
+/* Hover de iconos principales */
+:root[data-theme="mercado"] .icon-btn:hover {
+  background: #A8255F; /* bugambilia más oscuro */
+}
+:root[data-theme="mercado"] .btn-primary:hover {
+  background: #A8255F;
+}
+
+/* Pestañas seleccionadas en la nav inferior */
+:root[data-theme="mercado"] .nav-btn.on {
+  background: var(--gbg);
+  color: var(--g);
+}
+
+/* Placeholder en serifa cursiva sigue siendo bonito en DM Serif */
+:root[data-theme="mercado"] input::placeholder {
+  font-style: italic;
+  font-family: var(--serif);
+  color: var(--ink3);
+}
+
+/* Pills con más personalidad */
+:root[data-theme="mercado"] .pill-g { background: var(--gbg); color: #7A1F4F; }
+:root[data-theme="mercado"] .pill-y { background: var(--ybg); color: #7A4012; }
+:root[data-theme="mercado"] .pill-r { background: var(--rbg); color: #5C0F2F; }
+
+/* Iconos de proyecto: tonos cálidos */
+:root[data-theme="mercado"] .proj-icon-check { background: var(--gbg); }
+:root[data-theme="mercado"] .proj-icon-money { background: var(--ybg); }
+
+/* Imagen receta: fondo papaya-pálido en lugar de verde */
+:root[data-theme="mercado"] .recipe-img {
+  background: linear-gradient(135deg, #FDE0C7, #FBDDEC);
+  border-bottom-color: var(--line);
+}
+
+/* Recipe tag con bugambilia */
+:root[data-theme="mercado"] .recipe-tag {
+  background: var(--gbg);
+  color: var(--g);
+}
+
+/* Stat boxes — fondo cremoso con borde sutil */
+:root[data-theme="mercado"] .stat-box {
+  background: var(--bg2);
+  border: 0.5px solid var(--line);
+}
+
+/* Progreso de proyectos en bugambilia */
+:root[data-theme="mercado"] .pbar-fill {
+  background: var(--g);
+}
+:root[data-theme="mercado"] .pbar-fill-y {
+  background: #F08A2C; /* papaya */
+}
+:root[data-theme="mercado"] .proj-pct {
+  color: var(--g);
+}
+
+/* Sub-brand "tu asistente del hogar" en mayúsculas espaciadas */
+:root[data-theme="mercado"] .brand-sub {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 0.62rem;
+}

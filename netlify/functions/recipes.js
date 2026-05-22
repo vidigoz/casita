@@ -16,13 +16,19 @@ export const handler = async ev => {
 
 Ingredientes en despensa: ${ingredientes}
 
-Genera exactamente 3 recetas diferentes (variadas, pueden ser de cualquier cocina del mundo: mexicana, italiana, asiática, etc.) que se puedan hacer principalmente con estos ingredientes.
+Genera exactamente 3 recetas diferentes que se puedan hacer principalmente con estos ingredientes:
+1 desayuno
+1 comida
+1 cena
+
+Pueden ser de cualquier cocina del mundo (mexicana, italiana, asiática, etc.), pero deben sentirse adecuadas para ese momento del día.
 
 Responde SOLO con JSON válido, sin markdown, sin texto extra:
 {
   "recipes": [
     {
       "name": "Nombre de la receta",
+      "meal_type": "desayuno|comida|cena",
       "cuisine": "mexicana|italiana|asiatica|americana|española|otra",
       "time": "25 min",
       "servings": 4,
@@ -39,6 +45,8 @@ Reglas:
 - status ok = está en la despensa normal, low = queda poco, missing = no está pero se necesita poco
 - available = true si la mayoría de ingredientes están disponibles
 - steps: 4-6 pasos concisos y claros
+- Debe haber exactamente una receta con meal_type desayuno, una con meal_type comida y una con meal_type cena
+- Ordena las recetas así: desayuno, comida, cena
 - Varía las recetas en cada llamada (offset actual: ${offset})`;
 
   try {
