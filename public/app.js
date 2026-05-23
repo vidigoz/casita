@@ -216,11 +216,7 @@ function goTab(name, opts={}) {
   if (name==='pendientes') loadTasks();
   if (name==='mandado')    loadMandado();
   if (name==='recetas') {
-    if (!currentRecipes.length) {
-      const saved = loadRecipesLocal();
-      if (saved?.length) { currentRecipes = saved; renderRecipes(currentRecipes); }
-      else loadRecipes(false);
-    }
+    loadRecipes(false);
   }
   if (name==='proyectos')  loadProjects();
   if (name==='ajustes')    loadSettings();
@@ -570,43 +566,58 @@ function loadRecipesLocal() {
 }
 
 async function loadRecipes(next=false) {
-  if (next) recipeOffset += 3; else recipeOffset = 0;
+  if (next) recipeOffset += 1; else recipeOffset = 0;
   const el = document.getElementById('recipes-container');
   el.innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto"></div></div>';
   try {
     const pantryRes = USER.guest ? null : await api('pantry').catch(()=>null);
     const pantry = pantryRes?.items || [];
+    if (!pantry.some(p => p.level !== 'agotado')) {
+      currentRecipes = [];
+      renderRecipes(currentRecipes, 'empty_pantry');
+      return;
+    }
     const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset,household_size:USER.household_size||4}});
     currentRecipes = d.recipes || [];
     saveRecipesLocal();
-    renderRecipes(currentRecipes);
+    renderRecipes(currentRecipes, d.reason);
   } catch(e) {
-    el.innerHTML = '<div class="empty"><h3>Sin sugerencias</h3><p>Cuando tengas ingredientes en tu despensa, Casita te recomendará recetas</p></div>';
+    el.innerHTML = `<div class="empty"><h3>No pude generar recetas</h3><p>${esc(e.message)}</p></div>`;
   }
 }
 
-function renderRecipes(recipes) {
+function renderRecipes(recipes, reason=null) {
   const el = document.getElementById('recipes-container');
   if (!recipes.length) {
-    el.innerHTML = '<div class="empty"><h3>Sin sugerencias</h3><p>Agrega ingredientes a tu despensa para ver recetas</p></div>';
+    const msg = reason === 'no_themealdb_results'
+      ? 'TheMealDB no encontró recetas con ese ingrediente. Prueba usando un nombre más simple, como pollo, res, cerdo, pescado, camarón o huevo.'
+      : 'Agrega ingredientes a tu despensa para ver recetas';
+    el.innerHTML = `<div class="empty"><h3>Sin sugerencias</h3><p>${msg}</p></div>`;
     return;
   }
   const mealLabels = {desayuno:'desayuno',comida:'comida',cena:'cena'};
-  el.innerHTML = recipes.map((r,i)=>`
+  el.innerHTML = recipes.map((r,i)=>{
+    const name = r.name || r.nombre || 'Receta';
+    const time = r.time || r.tiempo || '30 min';
+    const servings = r.servings || r.porciones || 4;
+    const available = r.available ?? r.disponible;
+    const desc = r.description || r.tip || '';
+    return `
     <div class="recipe-card" data-idx="${i}" onclick="openRecipe(${i})">
       <div class="recipe-body">
         <div class="recipe-meal-label">${mealLabels[r.meal_type]||'receta'}</div>
-        <div class="recipe-name">${esc(r.name)}</div>
+        <div class="recipe-name">${esc(name)}</div>
         <div class="recipe-meta">
-          <span>⏱ ${r.time||'30 min'}</span>
-          <span>👥 ${r.servings||4} porciones</span>
-          <span style="color:${r.available?'var(--g)':'var(--y)'}">
-            ${r.available?'✓ tienes todo':'⚠ falta algo'}
+          <span>⏱ ${esc(time)}</span>
+          <span>👥 ${esc(servings)} porciones</span>
+          <span style="color:${available?'var(--g)':'var(--y)'}">
+            ${available?'✓ tienes todo':'⚠ falta algo'}
           </span>
         </div>
-        ${r.description?`<div class="recipe-desc">${esc(r.description)}</div>`:''}
+        ${desc?`<div class="recipe-desc">${esc(desc)}</div>`:''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   attachSwipeToCards();
 }
 
@@ -676,15 +687,19 @@ function openRecipe(idx) {
   const r = currentRecipes[idx];
   if (!r) return;
   const mealLabels = {desayuno:'desayuno',comida:'comida',cena:'cena'};
-  document.getElementById('rm-name').textContent = r.name;
-  document.getElementById('rm-meta').textContent = `${mealLabels[r.meal_type]||'receta'} · ${r.time||'30 min'} · ${r.servings||4} porciones · ${r.cuisine||'receta'}`;
+  const name = r.name || r.nombre || 'Receta';
+  const time = r.time || r.tiempo || '30 min';
+  const servings = r.servings || r.porciones || 4;
+  const cuisine = r.cuisine || r.cocina || 'receta';
+  document.getElementById('rm-name').textContent = name;
+  document.getElementById('rm-meta').textContent = `${mealLabels[r.meal_type]||'receta'} · ${time} · ${servings} porciones · ${cuisine}`;
 
   // Ingredients
   const ingEl = document.getElementById('rm-ingredients');
-  ingEl.innerHTML = (r.ingredients||[]).map(ing=>`
+  ingEl.innerHTML = (r.ingredients||r.ingredientes||[]).map(ing=>`
     <div class="ingredient-row">
-      <span class="ing-name">${esc(ing.name)}</span>
-      <span class="row-sub">${esc(ing.amount||'')}</span>
+      <span class="ing-name">${esc(ing.name || ing.nombre)}</span>
+      <span class="row-sub">${esc(ing.amount || ing.cantidad || '')}</span>
       <span class="ing-status ${ing.status==='ok'?'ing-ok':ing.status==='low'?'ing-low':'ing-missing'}">
         ${ing.status==='ok'?'tienes':ing.status==='low'?'poco':'falta'}
       </span>
@@ -692,11 +707,13 @@ function openRecipe(idx) {
 
   // Steps
   const stepsEl = document.getElementById('rm-steps');
-  stepsEl.innerHTML = (r.steps||[]).map((s,i)=>`
+  const steps = r.steps || r.pasos || [];
+  const tip = r.tip ? `<div class="recipe-tip">${esc(r.tip)}</div>` : '';
+  stepsEl.innerHTML = steps.map((s,i)=>`
     <div class="step-row">
       <div class="step-num">${i+1}</div>
       <div class="step-text">${esc(s)}</div>
-    </div>`).join('');
+    </div>`).join('') + tip;
 
   document.getElementById('recipe-modal').classList.remove('hidden');
 }

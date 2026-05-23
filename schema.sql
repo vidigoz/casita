@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS meals_history (
 );
 CREATE INDEX IF NOT EXISTS idx_meals ON meals_history(user_id, cooked_at DESC);
 
+CREATE TABLE IF NOT EXISTS recipe_cache (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  pantry_hash TEXT NOT NULL,
+  offset_value INTEGER NOT NULL DEFAULT 0,
+  recipes JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, pantry_hash, offset_value)
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_cache ON recipe_cache(user_id, pantry_hash, offset_value, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS receipts (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
