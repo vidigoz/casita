@@ -213,7 +213,13 @@ function goTab(name, opts={}) {
   if (name==='inicio')     loadInicio();
   if (name==='pendientes') loadTasks();
   if (name==='mandado')    loadMandado();
-  if (name==='recetas')    { if (!currentRecipes.length) loadRecipes(false); }
+  if (name==='recetas') {
+    if (!currentRecipes.length) {
+      const saved = loadRecipesLocal();
+      if (saved?.length) { currentRecipes = saved; renderRecipes(currentRecipes); }
+      else loadRecipes(false);
+    }
+  }
   if (name==='proyectos')  loadProjects();
   if (name==='ajustes')    loadSettings();
   if (name==='chat' && opts.focus!==false) document.getElementById('chat-input').focus();
@@ -553,6 +559,14 @@ async function addPantryManual() {
 }
 
 // ── RECETAS ──────────────────────────────────────────────────
+function saveRecipesLocal() {
+  try { localStorage.setItem('casita_recipes', JSON.stringify(currentRecipes)); } catch(e) {}
+}
+
+function loadRecipesLocal() {
+  try { return JSON.parse(localStorage.getItem('casita_recipes') || 'null'); } catch(e) { return null; }
+}
+
 async function loadRecipes(next=false) {
   if (next) recipeOffset += 3; else recipeOffset = 0;
   const el = document.getElementById('recipes-container');
@@ -562,6 +576,7 @@ async function loadRecipes(next=false) {
     const pantry = pantryRes?.items || [];
     const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset,household_size:USER.household_size||4}});
     currentRecipes = d.recipes || [];
+    saveRecipesLocal();
     renderRecipes(currentRecipes);
   } catch(e) {
     el.innerHTML = '<div class="empty"><h3>Sin sugerencias</h3><p>Cuando tengas ingredientes en tu despensa, Casita te recomendará recetas</p></div>';
@@ -647,6 +662,7 @@ async function swipeReplaceRecipe(idx) {
     const match = newRecipes.find(r=>r.meal_type===mealType) || newRecipes[0];
     if (match) {
       currentRecipes[idx] = match;
+      saveRecipesLocal();
       renderRecipes(currentRecipes);
     }
   } catch(e) {
