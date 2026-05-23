@@ -1,6 +1,8 @@
 /* ============================================================
    Casita — app.js
+   v0.0.5
    ============================================================ */
+const APP_VERSION = 'v0.0.5';
 
 // ── Storage ─────────────────────────────────────────────────
 const S = {
@@ -1129,6 +1131,7 @@ function loadSettings() {
   syncThemePicker();
   loadMemory();
   renderAccountSection();
+  document.getElementById('app-version').textContent = `Casita ${APP_VERSION}`;
 }
 
 function setTheme(theme) {
