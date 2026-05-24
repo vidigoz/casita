@@ -1,5 +1,5 @@
-const CACHE = 'casita-v0.0.6';
-const STATIC = ['/', '/styles.css', '/app.js', '/theme-mercado.css', '/theme-nocturno.css', '/icons/logo.png', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE = 'casita-v0.0.7';
+const STATIC = ['/', '/styles.css', '/app.js', '/theme-cocina.css', '/theme-mercado.css', '/theme-nocturno.css', '/icons/logo.png', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
