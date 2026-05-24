@@ -188,6 +188,15 @@
 :root[data-theme="nocturno"] .icon-btn:hover {
   background: var(--g2);
 }
+:root[data-theme="nocturno"] .icon-btn.mic-sm.listening {
+  background: #2F80ED;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(47,128,237,.22), 0 0 24px rgba(47,128,237,.65);
+}
+:root[data-theme="nocturno"] .icon-btn.mic-sm.listening:hover {
+  background: #56CCF2;
+  color: #07121F;
+}
 :root[data-theme="nocturno"] .icon-btn:disabled {
   background: var(--line);
   box-shadow: none;

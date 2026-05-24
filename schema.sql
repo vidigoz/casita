@@ -6,8 +6,12 @@ CREATE TABLE IF NOT EXISTS users (
   casita_name TEXT NOT NULL,
   household_size INTEGER DEFAULT 4,
   city TEXT DEFAULT 'CDMX',
+  pin_salt TEXT,
+  pin_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_salt TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT;
 
 CREATE TABLE IF NOT EXISTS tasks (
   id SERIAL PRIMARY KEY,

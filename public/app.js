@@ -54,26 +54,37 @@ function makeGuest() {
 
 function logout() {
   if (!confirm('¿Cerrar sesión?')) return;
-  S.d('user'); USER = makeGuest(); S.s('user', USER); chatHistory = []; location.reload();
+  S.d('user'); S.d('onboarding_settings_seen'); USER = makeGuest(); S.s('user', USER); chatHistory = []; location.reload();
+}
+
+function updateOnboardingPulse() {
+  const btn = document.getElementById('settings-btn');
+  if (!btn) return;
+  btn.classList.toggle('onboarding-pulse', Boolean(USER?.guest && !S.g('onboarding_settings_seen', false)));
 }
 
 async function createAccount() {
   const email = document.getElementById('s-account-email').value.trim();
-  const name  = document.getElementById('s-account-name').value.trim();
+  const pin   = document.getElementById('s-account-pin').value.trim();
+  const name  = document.getElementById('s-name').value.trim() || USER.casita_name || 'Casita';
   const btn   = document.getElementById('s-account-btn');
   const err   = document.getElementById('s-account-err');
   err.classList.add('hidden');
   if (!email || !email.includes('@')) { showAccountErr('Pon un correo válido'); return; }
-  if (!name) { showAccountErr('¿Cómo te llamas?'); return; }
+  if (!/^\d{4}$/.test(pin)) { showAccountErr('El PIN debe tener 4 dígitos'); return; }
+  const household = parseInt(document.getElementById('s-household').value, 10) || USER.household_size || 4;
+  const city = document.getElementById('s-city').value.trim() || USER.city || 'CDMX';
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
   try {
-    const d = await api('auth', { method:'POST', body:{ action:'register', email, casita_name: name } });
+    const d = await api('auth', { method:'POST', body:{ action:'register', email, pin, casita_name: name, household_size: household, city } });
     USER = d.user;
     S.s('user', USER);
     setGreeting();
+    updateOnboardingPulse();
     renderAccountSection();
-    toast('¡Cuenta creada! ✓');
+    addWelcomeBubble();
+    toast(d.updated ? 'Cuenta actualizada ✓' : '¡Cuenta creada! ✓');
   } catch(e) {
     showAccountErr(e.message);
   } finally {
@@ -84,18 +95,22 @@ async function createAccount() {
 
 async function loginAccount() {
   const email = document.getElementById('s-account-email').value.trim();
+  const pin   = document.getElementById('s-account-pin').value.trim();
   const btn   = document.getElementById('s-account-login-btn');
   const err   = document.getElementById('s-account-err');
   err.classList.add('hidden');
   if (!email || !email.includes('@')) { showAccountErr('Pon un correo válido'); return; }
+  if (!/^\d{4}$/.test(pin)) { showAccountErr('El PIN debe tener 4 dígitos'); return; }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
   try {
-    const d = await api('auth', { method:'POST', body:{ action:'login', email } });
+    const d = await api('auth', { method:'POST', body:{ action:'login', email, pin } });
     USER = d.user;
     S.s('user', USER);
     setGreeting();
+    updateOnboardingPulse();
     renderAccountSection();
+    addWelcomeBubble();
     toast('¡Bienvenido de vuelta! ✓');
   } catch(e) {
     showAccountErr(e.message);
@@ -109,6 +124,15 @@ function showAccountErr(msg) {
   const el = document.getElementById('s-account-err');
   el.textContent = msg;
   el.classList.remove('hidden');
+}
+
+function toggleAccountPin() {
+  const inp = document.getElementById('s-account-pin');
+  const btn = document.getElementById('s-account-pin-toggle');
+  if (!inp || !btn) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'ocultar pin' : 'ver pin';
 }
 
 // ── Launch ───────────────────────────────────────────────────
@@ -174,12 +198,18 @@ function launchApp() {
   setupVoice();
   initFabDrag();
   setGreeting();
+  updateOnboardingPulse();
   loadInicio();
   if (USER.guest) {
-    addBubble('ai', `¡Hola! Soy Casita 👋 Para chatear y guardar tus datos, crea una cuenta gratis en Ajustes.`);
+    addBubble('ai', `Hola Bienvenido! ve a configuracion para crear una cuenta`);
   } else {
-    addBubble('ai', `Hola ${USER.casita_name} 👋 Aquí estoy para ayudarte con todo lo del hogar. Puedes hablarme o escribirme.`);
+    addWelcomeBubble();
   }
+}
+
+function addWelcomeBubble() {
+  const name = USER?.casita_name || 'bienvenida';
+  addBubble('ai', `Hola ${name} 👋 ¿cómo puedo ayudarte hoy?`);
 }
 
 function setGreeting() {
@@ -187,7 +217,7 @@ function setGreeting() {
   const g = h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
   const name = USER.casita_name || 'Casita';
   document.getElementById('greet-h1').innerHTML = USER.guest
-    ? `${g},<br><em>bienvenido</em>`
+    ? `Hola Bienvenido!<br><em>ve a configuracion para crear una cuenta</em>`
     : `${g},<br><em>${name}</em>`;
   document.getElementById('hdr-sub').textContent = USER.guest ? 'tu asistente del hogar' : `hola ${name.toLowerCase()}`;
   const days=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
@@ -219,7 +249,13 @@ function goTab(name, opts={}) {
     loadRecipes(false);
   }
   if (name==='proyectos')  loadProjects();
-  if (name==='ajustes')    loadSettings();
+  if (name==='ajustes') {
+    if (USER.guest) {
+      S.s('onboarding_settings_seen', true);
+      updateOnboardingPulse();
+    }
+    loadSettings();
+  }
   if (name==='chat' && opts.focus!==false) document.getElementById('chat-input').focus();
 }
 
@@ -1239,17 +1275,20 @@ function renderAccountSection() {
   }
   el.innerHTML = `
     <div style="font-size:.8rem;color:var(--ink2);line-height:1.6;margin-bottom:.875rem">
-      Crea una cuenta para guardar tus datos y acceder desde cualquier dispositivo.
+      Crea una cuenta para guardar tus datos. Si el correo ya existe, escribe su PIN para entrar y actualizar tus datos.
     </div>
     <div id="s-account-err" class="auth-error hidden" style="margin-bottom:.75rem"></div>
     <div style="display:flex;flex-direction:column;gap:.625rem">
       <div>
-        <div class="auth-label">Tu nombre</div>
-        <input id="s-account-name" class="sfield" style="width:100%;margin-top:.25rem" placeholder="Lupita" value="${esc(USER.casita_name==='Casita'?'':USER.casita_name)}">
-      </div>
-      <div>
         <div class="auth-label">Correo</div>
         <input id="s-account-email" class="sfield" type="email" style="width:100%;margin-top:.25rem" placeholder="tu@correo.com">
+      </div>
+      <div>
+        <div class="auth-label">PIN de 4 dígitos</div>
+        <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
+          <input id="s-account-pin" class="sfield" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" style="flex:1;min-width:0" placeholder="1234">
+          <button id="s-account-pin-toggle" type="button" class="btn-ghost" onclick="toggleAccountPin()" style="padding:.6rem .85rem;white-space:nowrap">ver pin</button>
+        </div>
       </div>
       <div style="display:flex;gap:.625rem;flex-wrap:wrap">
         <button id="s-account-btn" class="btn-primary" onclick="createAccount()">Crear cuenta</button>

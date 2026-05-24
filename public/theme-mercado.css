@@ -134,6 +134,14 @@
 :root[data-theme="mercado"] .icon-btn:hover {
   background: #A8255F; /* bugambilia más oscuro */
 }
+:root[data-theme="mercado"] .icon-btn.mic-sm.listening {
+  background: #168A65;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(22,138,101,.18), 0 0 22px rgba(22,138,101,.58);
+}
+:root[data-theme="mercado"] .icon-btn.mic-sm.listening:hover {
+  background: #0F6F52;
+}
 :root[data-theme="mercado"] .btn-primary:hover {
   background: #A8255F;
 }
