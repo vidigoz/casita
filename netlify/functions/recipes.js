@@ -3,24 +3,7 @@ import { createHash } from 'node:crypto';
 import { ok, err, cors, body, uid, sql } from './_lib.js';
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const CACHE_VERSION = 'lunch-only-fallback-v2';
-const PROTEIN_HINTS = [
-  'pollo','pechuga','muslo','carne','res','molida','bistec','cerdo','puerco',
-  'chuleta','jamon','tocino','pescado','atun','salmon','camaron','camarones',
-  'huevo','huevos','chorizo','salchicha','pavo','tilapia'
-];
-
-const THEMEALDB_FALLBACKS = [
-  { es: ['pollo','pechuga','muslo'], en: ['chicken'] },
-  { es: ['res','bistec','carne','molida'], en: ['beef'] },
-  { es: ['cerdo','puerco','chuleta','tocino','chorizo','jamon'], en: ['pork'] },
-  { es: ['pescado','tilapia'], en: ['fish'] },
-  { es: ['atun'], en: ['tuna'] },
-  { es: ['salmon'], en: ['salmon'] },
-  { es: ['camaron','camarones'], en: ['shrimp'] },
-  { es: ['huevo','huevos'], en: ['egg'] },
-  { es: ['pavo'], en: ['turkey'] }
-];
+const CACHE_VERSION = 'claude-recipes-v1';
 
 function normalizeText(value='') {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -46,89 +29,108 @@ function pantryList(pantry) {
     .join('\n');
 }
 
-function pickMainIngredient(pantry) {
-  const available = pantry.filter(p => p.name && p.level !== 'agotado');
-  const strong = available.filter(p => ['lleno','suficiente'].includes(p.level || 'suficiente'));
-  const protein = strong.find(p => PROTEIN_HINTS.some(h => normalizeText(p.name).includes(h)));
-  return protein || strong[0] || available[0] || null;
+function validPantryItems(pantry) {
+  return pantry.filter(p => p.name && p.level !== 'agotado');
 }
 
-async function translateMainIngredient(client, ingredient) {
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 20,
-    messages: [{ role:'user', content:
-      `Translate this Mexican pantry ingredient to English for a recipe search. Return only the ingredient name in English, no punctuation, no explanation.\n\n${ingredient}`
-    }]
-  });
-
-  return res.content
-    .filter(c => c.type === 'text')
-    .map(c => c.text)
-    .join('')
+function stripMarkdownJson(text) {
+  return text
     .trim()
-    .replace(/^["'`]+|["'`.]+$/g, '')
-    .toLowerCase();
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/,'')
+    .trim();
 }
 
-function seededPick(items, count, offset) {
-  const list = [...items];
-  let seed = (offset + 1) * 9301 + list.length * 49297;
-  for (let i = list.length - 1; i > 0; i--) {
-    seed = (seed * 9301 + 49297) % 233280;
-    const j = seed % (i + 1);
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list.slice(0, Math.min(count, list.length));
+function buildPrompt(pantry, householdSize, offset) {
+  return `Eres el chef de Casita, una app para mamás mexicanas.
+
+DESPENSA ACTUAL:
+${pantryList(pantry)}
+
+PERSONAS EN CASA: ${householdSize}
+
+INSTRUCCIONES:
+Genera exactamente 3 recetas diferentes y variadas que se puedan preparar principalmente con los ingredientes disponibles. Pueden ser recetas de cualquier cocina del mundo pero priorizando lo que hay en la despensa. Usa vocabulario mexicano natural: jitomate, chile, elote, ahorita. Los pasos deben sonar como si una amiga te explicara, no como un libro de cocina formal.
+
+Varía el tipo de recetas: no pongas tres guisados, mezcla entre sopas, arroces, guisados, antojitos, etc. Con cada llamada genera recetas diferentes para dar variedad (seed de variación: ${offset}).
+
+Ingredientes con nivel "agotado" no los uses. Los de nivel "poco" úsalos con moderación.
+
+Responde SOLO con JSON válido sin markdown:
+{
+  "recetas": [
+    {
+      "nombre": "nombre en español mexicano",
+      "tiempo": "25 min",
+      "porciones": ${householdSize},
+      "cocina": "mexicana|italiana|asiatica|americana|española|otra",
+      "disponible": true,
+      "ingredientes": [
+        {
+          "nombre": "nombre del ingrediente",
+          "cantidad": "2 tazas",
+          "status": "ok|low|missing"
+        }
+      ],
+      "pasos": [
+        "Paso natural y claro como lo diría una amiga..."
+      ],
+      "tip": "Tip corto opcional, tipo consejo de cocina mexicana"
+    }
+  ]
 }
 
-async function searchTheMealDB(ingredientEN, offset) {
-  const params = new URLSearchParams({ i: ingredientEN });
-  const res = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?${params}`);
-  if (!res.ok) throw new Error(`TheMealDB error: ${res.status}`);
+Status de ingredientes:
+- ok = hay suficiente en la despensa
+- low = hay poco pero alcanza
+- missing = no está pero se necesita poco, se puede conseguir fácil
 
-  const data = await res.json();
-  const meals = data.meals || [];
-  if (!meals.length) return [];
+Genera recetas DIFERENTES en cada llamada. El offset ${offset} te ayuda a variar.`;
+}
 
-  const count = Math.min(meals.length, 8 + (Math.abs(offset) % 5));
-  return seededPick(meals, count, offset).map(m => ({
-    id: m.idMeal,
-    name: m.strMeal
+function normalizeRecipes(recetas, householdSize) {
+  return (recetas || []).slice(0, 3).map(r => ({
+    nombre: r.nombre || 'Receta',
+    tiempo: r.tiempo || '30 min',
+    porciones: Number(r.porciones) || householdSize,
+    cocina: ['mexicana','italiana','asiatica','americana','española','otra'].includes(r.cocina) ? r.cocina : 'otra',
+    disponible: r.disponible !== false,
+    ingredientes: Array.isArray(r.ingredientes) ? r.ingredientes.map(ing => ({
+      nombre: ing.nombre || '',
+      cantidad: ing.cantidad || '',
+      status: ['ok','low','missing'].includes(ing.status) ? ing.status : 'missing'
+    })).filter(ing => ing.nombre) : [],
+    pasos: Array.isArray(r.pasos) ? r.pasos.filter(Boolean) : [],
+    tip: r.tip || ''
   }));
 }
 
-function buildSearchTerms(mainIngredient, ingredientEN) {
-  const terms = new Set();
-  const translated = normalizeText(ingredientEN || '').trim();
-  const original = normalizeText(mainIngredient?.name || '');
-  if (translated) terms.add(translated);
-
-  THEMEALDB_FALLBACKS.forEach(group => {
-    if (group.es.some(term => original.includes(term)) || group.en.some(term => translated.includes(term))) {
-      group.en.forEach(term => terms.add(term));
-    }
-  });
-
-  return [...terms].filter(Boolean);
+async function ensureRecipeCacheTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS recipe_cache (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      pantry_hash TEXT NOT NULL,
+      offset_value INTEGER NOT NULL DEFAULT 0,
+      recipes JSONB NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, pantry_hash, offset_value)
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_recipe_cache
+    ON recipe_cache(user_id, pantry_hash, offset_value, created_at DESC)
+  `;
 }
 
-async function searchTheMealDBWithFallbacks(mainIngredient, ingredientEN, offset) {
-  const terms = buildSearchTerms(mainIngredient, ingredientEN);
-  for (const term of terms) {
-    const candidates = await searchTheMealDB(term, offset);
-    if (candidates.length) return { candidates, ingredient: term };
-  }
-  return { candidates: [], ingredient: terms[0] || ingredientEN };
-}
-
-async function getCachedRecipes(userId, pantryHash, offset) {
+async function getCachedRecipes(userId, pantryHash) {
   const rows = await sql`
     SELECT recipes
     FROM recipe_cache
     WHERE user_id = ${userId}
       AND pantry_hash = ${pantryHash}
-      AND offset_value = ${offset}
+      AND offset_value = 0
       AND created_at > NOW() - INTERVAL '24 hours'
     ORDER BY created_at DESC
     LIMIT 1
@@ -136,117 +138,76 @@ async function getCachedRecipes(userId, pantryHash, offset) {
   return rows[0]?.recipes || null;
 }
 
-async function saveCachedRecipes(userId, pantryHash, offset, recipes) {
+async function saveCachedRecipes(userId, pantryHash, recipes) {
+  await sql`DELETE FROM recipe_cache WHERE user_id = ${userId}`;
   await sql`
     INSERT INTO recipe_cache (user_id, pantry_hash, offset_value, recipes, created_at)
-    VALUES (${userId}, ${pantryHash}, ${offset}, ${JSON.stringify(recipes)}::jsonb, NOW())
+    VALUES (${userId}, ${pantryHash}, 0, ${JSON.stringify(recipes)}::jsonb, NOW())
     ON CONFLICT (user_id, pantry_hash, offset_value)
     DO UPDATE SET recipes = EXCLUDED.recipes, created_at = NOW()
   `;
 }
 
-async function selectAndTranslateRecipes(client, pantry, householdSize, candidates) {
-  const prompt = `Eres el asistente de cocina de Casita, una app para mamás mexicanas.
-
-DESPENSA ACTUAL:
-${pantryList(pantry)}
-
-PERSONAS EN CASA: ${householdSize}
-
-RECETAS CANDIDATAS de TheMealDB (en inglés):
-${candidates.map(r => `- ${r.name} (ID: ${r.id})`).join('\n')}
-
-Selecciona 1 receta para la comida/almuerzo que se pueda hacer lo mejor posible con lo que hay en la despensa. Prioriza la que necesite menos ingredientes faltantes. Traduce al español mexicano natural y coloquial. Adapta las porciones. Usa vocabulario mexicano: jitomate no tomate, chile no pimiento, elote no choclo.
-
-Responde SOLO con JSON válido sin markdown:
-{
-  "recetas": [{
-    "id": "id de TheMealDB",
-    "nombre": "nombre en español mexicano",
-    "tiempo": "30 min",
-    "porciones": 4,
-    "cocina": "mexicana|italiana|asiatica|americana|española|otra",
-    "disponible": true,
-    "ingredientes": [{"nombre":"...","cantidad":"...","status":"ok|low|missing"}],
-    "pasos": ["paso 1 claro y natural...","paso 2..."],
-    "tip": "tip corto opcional tipo consejo de amiga"
-  }]
-}
-
-status de ingredientes:
-- ok = hay suficiente en la despensa
-- low = hay poco pero alcanza
-- missing = no está, hay que comprarlo`;
-
-  const res = await client.messages.create({
+async function generateRecipes(client, pantry, householdSize, offset) {
+  const prompt = buildPrompt(pantry, householdSize, offset);
+  const res = await client.beta.messages.create({
+    betas:['prompt-caching-2024-07-31'],
     model: MODEL,
-    max_tokens: 3000,
-    messages: [{ role:'user', content: prompt }]
+    max_tokens: 3500,
+    system:[{ type:'text', text:prompt, cache_control:{ type:'ephemeral' } }],
+    messages:[{ role:'user', content:'Genera las recetas ahora.' }]
   });
 
-  let text = res.content.filter(c => c.type === 'text').map(c => c.text).join('').trim();
-  text = text.replace(/^```json\s*/i, '').replace(/```$/,'').trim();
-  return JSON.parse(text).recetas || [];
-}
-
-function normalizeRecipes(recetas, candidates, householdSize) {
-  const byId = new Map(candidates.map(r => [String(r.id), r]));
-  return recetas.slice(0, 1).map((r) => {
-    const candidate = byId.get(String(r.id)) || candidates[0] || {};
-    return {
-      id: String(r.id || candidate.id || ''),
-      name: r.nombre || candidate.name || 'Receta',
-      nombre: r.nombre || candidate.name || 'Receta',
-      description: r.tip || '',
-      tip: r.tip || '',
-      meal_type: 'comida',
-      cuisine: r.cocina || 'otra',
-      cocina: r.cocina || 'otra',
-      time: r.tiempo || '30 min',
-      tiempo: r.tiempo || '30 min',
-      servings: r.porciones || householdSize,
-      porciones: r.porciones || householdSize,
-      available: Boolean(r.disponible),
-      disponible: Boolean(r.disponible),
-      ingredients: r.ingredientes || [],
-      ingredientes: r.ingredientes || [],
-      steps: r.pasos || [],
-      pasos: r.pasos || []
-    };
-  });
+  const text = stripMarkdownJson(
+    res.content.filter(c => c.type === 'text').map(c => c.text).join('').trim()
+  );
+  const parsed = JSON.parse(text);
+  return normalizeRecipes(parsed.recetas, householdSize);
 }
 
 export const handler = async ev => {
   if (ev.httpMethod === 'OPTIONS') return cors();
   if (ev.httpMethod !== 'POST') return err('Method not allowed', 405);
-  const userId = uid(ev); if (!userId) return err('No autenticado', 401);
 
-  const { pantry=[], offset=0, household_size=4 } = body(ev);
+  const userId = uid(ev);
+  if (!userId) return err('No autenticado', 401);
+
+  const { offset=0 } = body(ev);
+  const offsetValue = Number.isFinite(Number(offset)) ? Number(offset) : 0;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return err('Sin Anthropic API key', 500);
 
-  const availablePantry = pantry.filter(p => p.name && p.level !== 'agotado');
-  if (!availablePantry.length) return ok({ recipes:[], reason:'empty_pantry' });
-
   try {
-    const pantryHash = pantrySignature(pantry);
-    const offsetValue = Number.isFinite(Number(offset)) ? Number(offset) : 0;
-    const cached = await getCachedRecipes(userId, pantryHash, offsetValue);
-    if (cached) return ok({ recipes: cached, source:'cache' });
+    await ensureRecipeCacheTable();
 
-    const mainIngredient = pickMainIngredient(pantry);
-    if (!mainIngredient) return ok({ recipes:[], reason:'empty_pantry' });
+    const [user] = await sql`SELECT household_size FROM users WHERE id=${userId}`;
+    const pantry = await sql`
+      SELECT name, category, level, approx_quantity
+      FROM pantry
+      WHERE user_id=${userId}
+      ORDER BY category, name
+    `;
+    const householdSize = Number(user?.household_size) || 4;
+    const validItems = validPantryItems(pantry);
+
+    if (validItems.length < 2) {
+      return ok({ recipes: [], message: 'Agrega ingredientes a tu despensa para ver recetas' });
+    }
+
+    const pantryHash = pantrySignature(pantry);
+    if (offsetValue === 0) {
+      const cached = await getCachedRecipes(userId, pantryHash);
+      if (cached) return ok({ recipes: cached });
+    }
 
     const client = new Anthropic({ apiKey: anthropicKey });
-    const ingredientEN = await translateMainIngredient(client, mainIngredient.name);
-    const { candidates, ingredient } = await searchTheMealDBWithFallbacks(mainIngredient, ingredientEN, offsetValue);
-    if (!candidates.length) return ok({ recipes:[], reason:'no_themealdb_results', ingredient });
+    const recipes = await generateRecipes(client, pantry, householdSize, offsetValue);
 
-    const selected = await selectAndTranslateRecipes(client, pantry, household_size, candidates);
-    const recipes = normalizeRecipes(selected, candidates, household_size);
+    if (offsetValue === 0) {
+      await saveCachedRecipes(userId, pantryHash, recipes);
+    }
 
-    await saveCachedRecipes(userId, pantryHash, offsetValue, recipes);
-    return ok({ recipes, source:'themealdb', ingredient });
+    return ok({ recipes });
   } catch(e) {
     return err('Error generando recetas: '+e.message, 500);
   }

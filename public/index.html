@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="cocina">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Casita">
-<meta name="theme-color" content="#F7F3EC">
+<meta name="theme-color" content="#FAF5EC">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/theme-cocina.css">
 <link rel="stylesheet" href="/theme-mercado.css">
 <link rel="stylesheet" href="/theme-nocturno.css">
 </head>
@@ -161,6 +162,10 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
           otras ideas
         </button>
+        <div class="slabel" style="margin-top:1rem">guardadas</div>
+        <div id="saved-recipes-container">
+          <div class="empty"><p>Guarda recetas con la estrella para verlas aquí</p></div>
+        </div>
       </div>
       <div id="r-hist" class="hidden">
         <div class="slabel">últimos 7 días</div>
@@ -220,7 +225,7 @@
       <div class="slabel" style="margin-top:.5rem">apariencia</div>
       <div class="card">
         <div class="seg theme-seg" id="theme-picker" role="group" aria-label="Tema visual">
-          <button class="seg-btn theme-btn" data-theme-choice="classic" onclick="setTheme('classic')" type="button"><span class="theme-dot theme-dot-classic"></span>Clásico</button>
+          <button class="seg-btn theme-btn" data-theme-choice="cocina" onclick="setTheme('cocina')" type="button"><span class="theme-dot theme-dot-cocina"></span>Cocina</button>
           <button class="seg-btn theme-btn" data-theme-choice="mercado" onclick="setTheme('mercado')" type="button"><span class="theme-dot theme-dot-mercado"></span>Mercado</button>
           <button class="seg-btn theme-btn" data-theme-choice="nocturno" onclick="setTheme('nocturno')" type="button"><span class="theme-dot theme-dot-nocturno"></span>Nocturno</button>
         </div>

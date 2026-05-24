@@ -16,13 +16,14 @@ let USER = null;
 let chatHistory = [];
 let recipeOffset = 0;
 let currentRecipes = [];
+let savedRecipes = [];
 let voiceRecognition = null;
 let isListening = false;
 let voiceStopRequested = false;
 let voiceSilenceTimer = null;
 
 const THEMES = {
-  classic: { label: 'Clásico', color: '#F7F3EC' },
+  cocina: { label: 'Cocina', color: '#FAF5EC' },
   mercado: { label: 'Mercado', color: '#FFF8EC' },
   nocturno:{ label: 'Nocturno', color: '#1A1410' }
 };
@@ -416,11 +417,15 @@ async function loadShoppingList() {
 
 function renderShopping(items) {
   const el = document.getElementById('shopping-list');
+  const pending = items.filter(i => !i.done);
+  const done = items.filter(i => i.done);
+
   if (!items.length) {
     el.innerHTML = '<div class="empty"><h3>Lista vacía</h3><p>Dile a Casita "necesito X" o agrégalo abajo</p></div>';
     return;
   }
-  el.innerHTML = items.map(i=>`
+
+  const shopRow = i => `
     <div class="row" id="shop-${i.id}">
       <div class="chk chk-sq ${i.done?'done':''}" onclick="toggleShop(${i.id},${!i.done})"></div>
       <div style="flex:1">
@@ -429,7 +434,30 @@ function renderShopping(items) {
       </div>
       ${i.quantity?`<span class="row-sub">${esc(i.quantity)}</span>`:''}
       <button class="del-btn" onclick="delShop(${i.id})">×</button>
-    </div>`).join('');
+    </div>`;
+
+  let html = '';
+
+  if (pending.length) {
+    html += `
+      <div class="slabel">por comprar</div>
+      <div class="card" style="padding:.5rem 1.1rem">${pending.map(shopRow).join('')}</div>`;
+  } else {
+    html += `
+      <div class="slabel">por comprar</div>
+      <div class="card" style="padding:.5rem 1.1rem"><div class="empty" style="padding:1.25rem 0"><p>Mandado completo ✓</p></div></div>`;
+  }
+
+  if (done.length) {
+    html += `
+      <button class="done-toggle" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.done-toggle-arrow').style.transform=this.nextElementSibling.classList.contains('hidden')?'':'rotate(90deg)'">
+        <span style="font-size:.75rem;font-weight:600;color:var(--ink3)">comprado (${done.length})</span>
+        <svg class="done-toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:13px;height:13px;color:var(--ink3);transition:transform .2s;transform:rotate(90deg)"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="card" style="padding:.5rem 1.1rem">${done.map(shopRow).join('')}</div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 function guessCategory(name) {
@@ -566,7 +594,7 @@ function setPantryGroup(group, btn) {
 async function updatePantryLevel(id, level) {
   try {
     await api('pantry',{method:'POST',body:{action:'update',id,level}});
-    loadPantry();
+    await Promise.all([loadPantry(), loadShoppingList()]);
   } catch(e) { toast(e.message); }
 }
 
@@ -611,23 +639,24 @@ async function loadRecipes(next=false) {
     if (!pantry.some(p => p.level !== 'agotado')) {
       currentRecipes = [];
       renderRecipes(currentRecipes, 'empty_pantry');
+      loadSavedRecipes();
       return;
     }
     const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset,household_size:USER.household_size||4}});
     currentRecipes = d.recipes || [];
     saveRecipesLocal();
+    await loadSavedRecipes();
     renderRecipes(currentRecipes, d.reason);
   } catch(e) {
     el.innerHTML = `<div class="empty"><h3>No pude generar recetas</h3><p>${esc(e.message)}</p></div>`;
+    loadSavedRecipes();
   }
 }
 
 function renderRecipes(recipes, reason=null) {
   const el = document.getElementById('recipes-container');
   if (!recipes.length) {
-    const msg = reason === 'no_themealdb_results'
-      ? 'TheMealDB no encontró recetas con ese ingrediente. Prueba usando un nombre más simple, como pollo, res, cerdo, pescado, camarón o huevo.'
-      : 'Agrega ingredientes a tu despensa para ver recetas';
+    const msg = 'Agrega ingredientes a tu despensa para ver recetas';
     el.innerHTML = `<div class="empty"><h3>Sin sugerencias</h3><p>${msg}</p></div>`;
     return;
   }
@@ -638,8 +667,12 @@ function renderRecipes(recipes, reason=null) {
     const servings = r.servings || r.porciones || 4;
     const available = r.available ?? r.disponible;
     const desc = r.description || r.tip || '';
+    const saved = getSavedItemForRecipe(r);
     return `
     <div class="recipe-card" data-idx="${i}" onclick="openRecipe(${i})">
+      <button class="recipe-save ${saved?'saved':''}" onclick="toggleSaveRecipe(${i},event)" aria-label="${saved?'Quitar de guardadas':'Guardar receta'}">
+        <svg viewBox="0 0 24 24" fill="${saved?'currentColor':'none'}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </button>
       <div class="recipe-body">
         <div class="recipe-meal-label">${mealLabels[r.meal_type]||'receta'}</div>
         <div class="recipe-name">${esc(name)}</div>
@@ -655,6 +688,98 @@ function renderRecipes(recipes, reason=null) {
     </div>`;
   }).join('');
   attachSwipeToCards();
+}
+
+function recipeName(r={}) {
+  return r.name || r.nombre || r.title || 'Receta';
+}
+
+function recipeNameKey(r={}) {
+  return recipeName(r).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function getSavedItemForRecipe(recipe) {
+  const key = recipeNameKey(recipe);
+  return savedRecipes.find(item => recipeNameKey(item.recipe || item) === key);
+}
+
+async function loadSavedRecipes(render=true) {
+  const el = document.getElementById('saved-recipes-container');
+  if (!el) return;
+  if (USER.guest) {
+    savedRecipes = [];
+    if (render) renderSavedRecipes();
+    return;
+  }
+  try {
+    const res = await apiAuth('saved-recipes');
+    savedRecipes = res?.items || [];
+  } catch(e) {
+    savedRecipes = [];
+  }
+  if (render) renderSavedRecipes();
+}
+
+function renderSavedRecipes() {
+  const el = document.getElementById('saved-recipes-container');
+  if (!el) return;
+  if (!savedRecipes.length) {
+    el.innerHTML = '<div class="empty"><p>Guarda recetas con la estrella para verlas aquí</p></div>';
+    return;
+  }
+  el.innerHTML = savedRecipes.map((item,i)=>{
+    const r = item.recipe || {};
+    const name = recipeName(r);
+    const time = r.time || r.tiempo || '30 min';
+    const servings = r.servings || r.porciones || 4;
+    return `
+      <div class="saved-recipe-row" onclick="openSavedRecipe(${i})">
+        <div style="flex:1;min-width:0">
+          <div class="saved-recipe-name">${esc(name)}</div>
+          <div class="row-sub">${esc(time)} · ${esc(servings)} porciones</div>
+        </div>
+        <button class="recipe-save saved small" onclick="deleteSavedRecipe(${item.id},event)" aria-label="Quitar receta guardada">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+async function toggleSaveRecipe(idx, ev) {
+  ev?.stopPropagation();
+  const recipe = currentRecipes[idx];
+  if (!recipe) return;
+  if (USER.guest) {
+    toast('Crea una cuenta para guardar recetas');
+    return;
+  }
+  const saved = getSavedItemForRecipe(recipe);
+  try {
+    if (saved) {
+      await api('saved-recipes',{method:'POST',body:{action:'delete',id:saved.id}});
+      toast('Quitada de guardadas');
+    } else {
+      await api('saved-recipes',{method:'POST',body:{action:'save',recipe}});
+      toast('Receta guardada ✓');
+    }
+    await loadSavedRecipes();
+    renderRecipes(currentRecipes);
+  } catch(e) { toast(e.message); }
+}
+
+async function deleteSavedRecipe(id, ev) {
+  ev?.stopPropagation();
+  try {
+    await api('saved-recipes',{method:'POST',body:{action:'delete',id}});
+    await loadSavedRecipes();
+    renderRecipes(currentRecipes);
+  } catch(e) { toast(e.message); }
+}
+
+function openSavedRecipe(idx) {
+  const item = savedRecipes[idx];
+  if (!item?.recipe) return;
+  showRecipeModal(item.recipe);
 }
 
 function attachSwipeToCards() {
@@ -694,8 +819,7 @@ function attachSwipeToCards() {
 }
 
 async function swipeReplaceRecipe(idx) {
-  const mealType = currentRecipes[idx]?.meal_type;
-  if (!mealType) return;
+  if (!currentRecipes[idx]) return;
   const card = document.querySelector(`#recipes-container .recipe-card[data-idx="${idx}"]`);
   if (card) {
     card.style.transition = '';
@@ -706,9 +830,11 @@ async function swipeReplaceRecipe(idx) {
   try {
     const pantryRes = USER.guest ? null : await api('pantry').catch(()=>null);
     const pantry = pantryRes?.items || [];
-    const d = await api('recipes',{method:'POST',body:{pantry,offset:recipeOffset+10+idx,single_meal:mealType,household_size:USER.household_size||4}});
+    const swipeOffset = recipeOffset + 10 + idx + Date.now() % 1000;
+    const d = await api('recipes',{method:'POST',body:{pantry,offset:swipeOffset,household_size:USER.household_size||4}});
     const newRecipes = d.recipes || [];
-    const match = newRecipes.find(r=>r.meal_type===mealType) || newRecipes[0];
+    const currentNames = new Set(currentRecipes.map(r => recipeNameKey(r)));
+    const match = newRecipes.find(r => !currentNames.has(recipeNameKey(r))) || newRecipes[0];
     if (match) {
       currentRecipes[idx] = match;
       saveRecipesLocal();
@@ -722,6 +848,10 @@ async function swipeReplaceRecipe(idx) {
 function openRecipe(idx) {
   const r = currentRecipes[idx];
   if (!r) return;
+  showRecipeModal(r);
+}
+
+function showRecipeModal(r) {
   const mealLabels = {desayuno:'desayuno',comida:'comida',cena:'cena'};
   const name = r.name || r.nombre || 'Receta';
   const time = r.time || r.tiempo || '30 min';
@@ -779,8 +909,26 @@ async function loadMealsHistory() {
           <div class="row-text">${esc(m.dish_name)}</div>
           <div class="row-sub">${fmtDate(m.cooked_at?.split('T')[0])} · para ${m.servings||'?'} personas</div>
         </div>
-      </div>`).join('');
+        <button class="del-btn" onclick="deleteMeal(${m.id})" aria-label="Borrar del historial">×</button>
+      </div>`).join('') + `
+      <button class="btn-ghost" onclick="clearMealsHistory()" style="width:100%;margin-top:.75rem">borrar historial</button>`;
   } catch(e) { console.error(e); }
+}
+
+async function deleteMeal(id) {
+  try {
+    await api('meals',{method:'POST',body:{action:'delete',id}});
+    loadMealsHistory();
+  } catch(e) { toast(e.message); }
+}
+
+async function clearMealsHistory() {
+  if (!confirm('¿Borrar todo el historial de recetas hechas?')) return;
+  try {
+    await api('meals',{method:'POST',body:{action:'clear'}});
+    loadMealsHistory();
+    toast('Historial borrado');
+  } catch(e) { toast(e.message); }
 }
 
 // ── PROYECTOS ────────────────────────────────────────────────
@@ -1189,20 +1337,21 @@ function loadSettings() {
 
 function setTheme(theme) {
   applyTheme(theme, true);
-  toast(`Tema ${THEMES[theme]?.label || THEMES.classic.label} aplicado ✓`);
+  toast(`Tema ${THEMES[theme]?.label || THEMES.cocina.label} aplicado ✓`);
 }
 
 function applyTheme(theme, save=false) {
-  if (!THEMES[theme]) theme = 'classic';
-  if (theme==='classic') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.dataset.theme = theme;
+  if (theme === 'classic') theme = 'cocina';
+  if (!THEMES[theme]) theme = 'cocina';
+  document.documentElement.dataset.theme = theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEMES[theme].color);
   if (save) S.s('theme', theme);
   syncThemePicker(theme);
 }
 
-function syncThemePicker(theme=S.g('theme','classic')) {
-  if (!THEMES[theme]) theme = 'classic';
+function syncThemePicker(theme=S.g('theme','cocina')) {
+  if (theme === 'classic') theme = 'cocina';
+  if (!THEMES[theme]) theme = 'cocina';
   document.querySelectorAll('[data-theme-choice]').forEach(btn=>{
     btn.classList.toggle('on', btn.dataset.themeChoice===theme);
   });
@@ -1348,7 +1497,7 @@ function toast(msg) {
 
 // ── INIT ─────────────────────────────────────────────────────
 function init() {
-  applyTheme(S.g('theme','classic'));
+  applyTheme(S.g('theme','cocina'));
   const saved = S.g('user');
   USER = (saved && (saved.id || saved.guest)) ? saved : makeGuest();
   S.s('user', USER);

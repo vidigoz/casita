@@ -72,6 +72,17 @@ CREATE TABLE IF NOT EXISTS recipe_cache (
 );
 CREATE INDEX IF NOT EXISTS idx_recipe_cache ON recipe_cache(user_id, pantry_hash, offset_value, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS saved_recipes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  recipe_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  recipe JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, recipe_key)
+);
+CREATE INDEX IF NOT EXISTS idx_saved_recipes ON saved_recipes(user_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS receipts (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

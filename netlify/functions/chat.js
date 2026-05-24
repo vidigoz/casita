@@ -1,37 +1,47 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql, ok, err, cors, body, uid } from './_lib.js';
 
-const SYSTEM = `Eres Casita, asistente del hogar para mamás mexicanas.
+const MODEL = 'claude-haiku-4-5-20251001';
 
-CONTEXTO: Solo conoces lo que hay en la base de datos de esta persona. 
-Si te preguntan noticias, política, clima de otros países, deportes u otras cosas externas, 
-responde amablemente: "Eso no lo sé, pero en lo que tiene que ver con tu hogar aquí estoy 😊"
+function buildSystemPrompt(user) {
+  const today = new Date().toISOString().split('T')[0];
+  return `Eres Casita, asistente del hogar para mamás mexicanas.
 
-PERSONALIDAD: Amiga de confianza. Directa, cálida, sin rodeos. Máximo 3 líneas.
-Hablas natural: "jitomate", "ahorita", "el mandado", "¿cuántos eran?"
+CONTEXTO DE LA USUARIA:
+- Nombre: ${user.casita_name || '—'}
+- Personas en casa: ${user.household_size || 4}
+- Ciudad: ${user.city || 'CDMX'}
+- Fecha de hoy: ${today}
 
-MEMORIA: Usa guardar_memoria() cuando la usuaria comparta algo estable y útil para el hogar:
-- vocabulario propio ("lonche" = comida para llevar)
-- tono preferido ("háblame corto", "sin emojis")
-- gustos/disgustos de comida, alergias o cosas a evitar
-- tiendas frecuentes, rutinas del hogar, horarios o hábitos de compra
-No guardes contraseñas, datos bancarios, documentos, direcciones exactas, temas políticos/religiosos ni datos sensibles innecesarios.
-Si una preferencia parece temporal o no estás segura, pregunta antes de guardarla.
+REGLAS:
+- Solo hablas de cosas del hogar. Si preguntan sobre noticias, política, deportes u otras cosas externas responde: "Eso no lo sé, pero en lo que tiene que ver con tu hogar aquí estoy 😊"
+- Español mexicano natural y coloquial. Máximo 3-4 líneas por respuesta.
+- Vocabulario mexicano: jitomate, ahorita, el mandado, chido.
 
-HERRAMIENTAS: Úsalas cuando aplique — no esperes que la usuaria sea explícita.
-- "hice X para Y" → descontar_despensa()
-- "se acabó X" / "ya no hay X" → actualizar_despensa(nivel=agotado)
+DIFERENCIA IMPORTANTE ENTRE LISTAS:
+- Pendientes/tareas = cosas que HAY QUE HACER (citas, pagos, recordatorios, juntas)
+- Mandado = cosas que HAY QUE COMPRAR en el súper o mercado
+- Despensa = lo que HAY EN CASA en este momento
+Ejemplos:
+- "agrega leche" → mandado (hay que comprarla)
+- "recuérdame llamar al dentista" → tarea (hay que hacerlo)
+- "ya compré leche" → despensa (ya está en casa) + tachar del mandado
+- "hice arroz con pollo" → descontar de despensa
+
+TOOLS DISPONIBLES — úsalas cuando aplique:
+- "hice X para Y personas" → descontar_despensa()
+- "se acabó/ya no hay X" → actualizar_despensa(nivel=agotado)
 - "queda poco X" → actualizar_despensa(nivel=poco)
-- "compré X" / "ya hay X" → actualizar_despensa(nivel=lleno)
-- "necesito X" / "falta X" / "agrega X al mandado" → agregar_mandado()
-- "recuérdame X" / "tengo cita" / "mañana hay" → agregar_tarea()
-- "quiero organizar X" / "voy a hacer una fiesta" / "empecé un negocio" → crear_proyecto()
-- "siempre compro en X" / "no me gusta X" / "dile X a Y" / "háblame de X forma" → guardar_memoria()`;
+- "compré X / ya hay X" → actualizar_despensa(nivel=lleno)
+- "agrega X / necesito X / falta X" → agregar_mandado()
+- "recuérdame / tengo cita / hay junta" → agregar_tarea()
+- "quiero organizar / empecé un negocio / voy a hacer una fiesta" → crear_proyecto()`;
+}
 
 const TOOLS = [
   {
     name:'actualizar_despensa',
-    description:'Cambia el nivel de un producto en la despensa.',
+    description:'Cambia el nivel de un producto en la despensa. Si queda poco o agotado, también se agrega al mandado como sugerencia.',
     input_schema:{type:'object',required:['nombre','nivel'],properties:{
       nombre:{type:'string'},
       nivel:{type:'string',enum:['lleno','suficiente','poco','agotado']},
@@ -41,7 +51,7 @@ const TOOLS = [
   },
   {
     name:'descontar_despensa',
-    description:'Descuenta ingredientes al registrar que se cocinó algo.',
+    description:'Registra que se cocinó algo y actualiza niveles de ingredientes en despensa.',
     input_schema:{type:'object',required:['platillo','porciones','ingredientes'],properties:{
       platillo:{type:'string'},
       porciones:{type:'number'},
@@ -54,159 +64,182 @@ const TOOLS = [
   },
   {
     name:'agregar_mandado',
-    description:'Agrega productos a la lista de compras.',
+    description:'Agrega productos a la lista de compras con source=user.',
     input_schema:{type:'object',required:['productos'],properties:{
       productos:{type:'array',items:{type:'object',required:['nombre'],properties:{
-        nombre:{type:'string'},cantidad:{type:'string'},categoria:{type:'string'},razon:{type:'string'}
+        nombre:{type:'string'},
+        cantidad:{type:'string'},
+        categoria:{type:'string'},
+        razon:{type:'string'}
       }}}
     }}
   },
   {
     name:'agregar_tarea',
-    description:'Agrega un recordatorio o tarea.',
+    description:'Agrega un pendiente, recordatorio o tarea.',
     input_schema:{type:'object',required:['titulo'],properties:{
-      titulo:{type:'string'},fecha:{type:'string',description:'YYYY-MM-DD'},
-      hora:{type:'string',description:'HH:MM'},categoria:{type:'string'}
+      titulo:{type:'string'},
+      fecha:{type:'string',description:'YYYY-MM-DD'},
+      hora:{type:'string',description:'HH:MM'},
+      categoria:{type:'string'}
     }}
   },
   {
     name:'crear_proyecto',
-    description:'Crea un proyecto (checklist para eventos/tareas, tracker_dinero para préstamos/ahorros).',
+    description:'Crea un proyecto checklist o tracker_dinero.',
     input_schema:{type:'object',required:['tipo','titulo'],properties:{
       tipo:{type:'string',enum:['checklist','tracker_dinero']},
       titulo:{type:'string'},
-      items:{type:'array',items:{type:'string'},description:'Para checklist: tareas'},
+      items:{type:'array',items:{type:'string'},description:'Para checklist: tareas iniciales'},
       meta_total:{type:'number',description:'Para tracker_dinero: monto total'},
       descripcion:{type:'string'}
-    }}
-  },
-  {
-    name:'guardar_memoria',
-    description:'Guarda una preferencia estable, vocabulario o dato útil del hogar para personalizar futuras respuestas.',
-    input_schema:{type:'object',required:['tipo','clave','valor'],properties:{
-      tipo:{type:'string',enum:['vocabulario','tono','comida_gusta','comida_evitar','alergia','compras','rutina','hogar','otro']},
-      clave:{type:'string',description:'Nombre corto de la memoria, por ejemplo cilantro, tienda_frecuente, lonche'},
-      valor:{type:'string',description:'Qué debe recordar Casita'},
-      confianza:{type:'number',description:'0 a 1, qué tan segura es la memoria'}
     }}
   }
 ];
 
-function memoryLine(m) {
-  const labels = {
-    vocabulario:'vocabulario',
-    tono:'tono',
-    comida_gusta:'le gusta',
-    comida_evitar:'evitar',
-    alergia:'alergia',
-    compras:'compras',
-    rutina:'rutina',
-    hogar:'hogar',
-    otro:'nota'
-  };
-  return `- ${labels[m.type]||m.type}: ${m.key} = ${m.value}`;
+function toolsWithPromptCache() {
+  return TOOLS.map((tool, index) => index === TOOLS.length - 1
+    ? {...tool, cache_control:{type:'ephemeral'}}
+    : tool
+  );
+}
+
+async function invalidateRecipeCache(userId) {
+  await sql`DELETE FROM recipe_cache WHERE user_id=${userId}`;
 }
 
 async function runTool(name, input, userId) {
-  if (name==='actualizar_despensa') {
-    await sql`INSERT INTO pantry(user_id,name,category,level,approx_quantity) VALUES(${userId},${input.nombre},${input.categoria||'otros'},${input.nivel},${input.cantidad||null}) ON CONFLICT(user_id,name) DO UPDATE SET level=EXCLUDED.level,approx_quantity=COALESCE(EXCLUDED.approx_quantity,pantry.approx_quantity),last_updated=NOW()`;
-    if (input.nivel==='poco'||input.nivel==='agotado') {
-      await sql`INSERT INTO shopping_list(user_id,name,category,source,reason) VALUES(${userId},${input.nombre},${input.categoria||null},'ai_suggestion',${input.nivel==='agotado'?'se agotó':'queda poco'}) ON CONFLICT DO NOTHING`;
+  if (name === 'actualizar_despensa') {
+    await sql`
+      INSERT INTO pantry(user_id,name,category,level,approx_quantity)
+      VALUES(${userId},${input.nombre},${input.categoria||'otros'},${input.nivel},${input.cantidad||null})
+      ON CONFLICT(user_id,name) DO UPDATE SET
+        level=EXCLUDED.level,
+        approx_quantity=COALESCE(EXCLUDED.approx_quantity,pantry.approx_quantity),
+        last_updated=NOW()`;
+
+    if (input.nivel === 'poco' || input.nivel === 'agotado') {
+      await sql`
+        INSERT INTO shopping_list(user_id,name,category,source,reason)
+        VALUES(${userId},${input.nombre},${input.categoria||null},'ai_suggestion',${input.nivel==='agotado'?'se agotó':'queda poco'})`;
     }
     return {ok:true};
   }
-  if (name==='descontar_despensa') {
-    await sql`INSERT INTO meals_history(user_id,dish_name,servings,ingredients_used) VALUES(${userId},${input.platillo},${input.porciones},${JSON.stringify(input.ingredientes)})`;
-    for (const ing of input.ingredientes) {
-      await sql`INSERT INTO pantry(user_id,name,category,level) VALUES(${userId},${ing.nombre},${ing.categoria||'otros'},${ing.nivel_nuevo}) ON CONFLICT(user_id,name) DO UPDATE SET level=EXCLUDED.level,last_updated=NOW()`;
-      if (ing.nivel_nuevo==='poco'||ing.nivel_nuevo==='agotado') {
-        await sql`INSERT INTO shopping_list(user_id,name,category,source,reason) VALUES(${userId},${ing.nombre},${ing.categoria||null},'ai_suggestion',${ing.nivel_nuevo==='agotado'?'se agotó':'queda poco'}) ON CONFLICT DO NOTHING`;
+
+  if (name === 'descontar_despensa') {
+    await sql`
+      INSERT INTO meals_history(user_id,dish_name,servings,ingredients_used)
+      VALUES(${userId},${input.platillo},${input.porciones},${JSON.stringify(input.ingredientes)})`;
+
+    for (const ing of input.ingredientes || []) {
+      await sql`
+        INSERT INTO pantry(user_id,name,category,level)
+        VALUES(${userId},${ing.nombre},${ing.categoria||'otros'},${ing.nivel_nuevo})
+        ON CONFLICT(user_id,name) DO UPDATE SET
+          level=EXCLUDED.level,
+          last_updated=NOW()`;
+
+      if (ing.nivel_nuevo === 'poco' || ing.nivel_nuevo === 'agotado') {
+        await sql`
+          INSERT INTO shopping_list(user_id,name,category,source,reason)
+          VALUES(${userId},${ing.nombre},${ing.categoria||null},'ai_suggestion',${ing.nivel_nuevo==='agotado'?'se agotó':'queda poco'})`;
       }
     }
+
+    await invalidateRecipeCache(userId);
     return {ok:true};
   }
-  if (name==='agregar_mandado') {
-    for (const p of input.productos) {
-      await sql`INSERT INTO shopping_list(user_id,name,quantity,category,source,reason) VALUES(${userId},${p.nombre},${p.cantidad||null},${p.categoria||null},'user',${p.razon||null})`;
-    }
-    return {ok:true};
-  }
-  if (name==='agregar_tarea') {
-    await sql`INSERT INTO tasks(user_id,title,due_date,due_time,category) VALUES(${userId},${input.titulo},${input.fecha||null},${input.hora||null},${input.categoria||null})`;
-    return {ok:true};
-  }
-  if (name==='crear_proyecto') {
-    const data = {tipo:input.tipo,descripcion:input.descripcion||'',items:input.items||[],meta_total:input.meta_total||null,checked:{},abonos:[]};
-    await sql`INSERT INTO projects(user_id,title,type,data) VALUES(${userId},${input.titulo},${input.tipo},${JSON.stringify(data)})`;
-    return {ok:true};
-  }
-  if (name==='guardar_memoria') {
-    const type = input.tipo || 'otro';
-    const key = (input.clave||'').toLowerCase().trim();
-    const value = (input.valor||'').trim();
-    if (!key || !value) return {ok:false,error:'missing memory'};
-    try {
+
+  if (name === 'agregar_mandado') {
+    for (const p of input.productos || []) {
       await sql`
-        INSERT INTO user_memory(user_id,type,key,value,confidence,source)
-        VALUES(${userId},${type},${key},${value},${input.confianza||0.8},'chat')
-        ON CONFLICT(user_id,type,key) DO UPDATE SET
-          value=EXCLUDED.value,
-          confidence=EXCLUDED.confidence,
-          source='chat',
-          updated_at=NOW()`;
-      return {ok:true};
-    } catch (e) {
-      console.warn('memory save skipped:', e.message);
-      return {ok:false,error:'memory unavailable'};
+        INSERT INTO shopping_list(user_id,name,quantity,category,source,reason)
+        VALUES(${userId},${p.nombre},${p.cantidad||null},${p.categoria||null},'user',${p.razon||null})`;
     }
+    return {ok:true};
   }
+
+  if (name === 'agregar_tarea') {
+    await sql`
+      INSERT INTO tasks(user_id,title,due_date,due_time,category)
+      VALUES(${userId},${input.titulo},${input.fecha||null},${input.hora||null},${input.categoria||null})`;
+    return {ok:true};
+  }
+
+  if (name === 'crear_proyecto') {
+    const data = {
+      tipo: input.tipo,
+      descripcion: input.descripcion || '',
+      items: input.items || [],
+      meta_total: input.meta_total || null,
+      checked: {},
+      abonos: []
+    };
+    await sql`
+      INSERT INTO projects(user_id,title,type,data)
+      VALUES(${userId},${input.titulo},${input.tipo},${JSON.stringify(data)})`;
+    return {ok:true};
+  }
+
   return {ok:false,error:'unknown tool'};
 }
 
 export const handler = async ev => {
-  if (ev.httpMethod==='OPTIONS') return cors();
-  if (ev.httpMethod!=='POST') return err('Method not allowed',405);
+  if (ev.httpMethod === 'OPTIONS') return cors();
+  if (ev.httpMethod !== 'POST') return err('Method not allowed',405);
+
   const userId = uid(ev);
   if (!userId) return err('No autenticado',401);
+
   const {message, history=[]} = body(ev);
   if (!message) return err('Mensaje vacío');
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return err('Sin API key',500);
 
   try {
     const client = new Anthropic({apiKey});
-    const user = await sql`SELECT casita_name,household_size,city FROM users WHERE id=${userId}`;
-    let memories = [];
-    try {
-      memories = await sql`SELECT type,key,value FROM user_memory WHERE user_id=${userId} ORDER BY updated_at DESC LIMIT 30`;
-    } catch (e) {
-      console.warn('memory load skipped:', e.message);
-    }
-    const u = user[0]||{};
-    const memoryText = memories.length ? `\n\nMEMORIA DE ESTA USUARIA:\n${memories.map(memoryLine).join('\n')}` : '';
-    const system = `${SYSTEM}\n\nUSUARIA: ${u.casita_name||'—'} · ${u.household_size||4} personas · ${u.city||'CDMX'} · fecha: ${new Date().toISOString().split('T')[0]}${memoryText}`;
+    const userRows = await sql`SELECT casita_name,household_size,city FROM users WHERE id=${userId}`;
+    const system = buildSystemPrompt(userRows[0] || {});
+    const recentHistory = history.slice(-6).map(h => ({role:h.role, content:h.content}));
+    let cur = [...recentHistory, {role:'user', content:message}];
+    let finalText = '';
 
-    const msgs = [...history.map(h=>({role:h.role,content:h.content})), {role:'user',content:message}];
     await sql`INSERT INTO chat_history(user_id,role,content) VALUES(${userId},'user',${message})`;
 
-    let finalText='';
-    let cur = msgs;
-    for (let i=0;i<5;i++) {
-      const res = await client.messages.create({model:'claude-sonnet-4-20250514',max_tokens:1024,system,tools:TOOLS,messages:cur});
-      if (res.stop_reason==='end_turn'||!res.content.some(c=>c.type==='tool_use')) {
-        finalText = res.content.filter(c=>c.type==='text').map(c=>c.text).join('\n');
+    for (let i=0; i<5; i++) {
+      const res = await client.beta.messages.create({
+        betas:['prompt-caching-2024-07-31'],
+        model: MODEL,
+        max_tokens: 700,
+        system:[{type:'text',text:system,cache_control:{type:'ephemeral'}}],
+        tools: toolsWithPromptCache(),
+        messages: cur
+      });
+
+      const toolUses = res.content.filter(c => c.type === 'tool_use');
+      if (res.stop_reason === 'end_turn' || !toolUses.length) {
+        finalText = res.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
         break;
       }
-      const toolUses = res.content.filter(c=>c.type==='tool_use');
-      const results  = [];
+
+      const results = [];
       for (const tu of toolUses) {
-        const r = await runTool(tu.name, tu.input, userId);
-        results.push({type:'tool_result',tool_use_id:tu.id,content:JSON.stringify(r)});
+        const result = await runTool(tu.name, tu.input, userId);
+        results.push({type:'tool_result',tool_use_id:tu.id,content:JSON.stringify(result)});
       }
-      cur = [...cur,{role:'assistant',content:res.content},{role:'user',content:results}];
+
+      cur = [
+        ...cur,
+        {role:'assistant',content:res.content},
+        {role:'user',content:results}
+      ];
     }
 
+    if (!finalText) finalText = 'Listo, ya quedó.';
     await sql`INSERT INTO chat_history(user_id,role,content) VALUES(${userId},'assistant',${finalText})`;
     return ok({reply:finalText});
-  } catch(e) { return err(e.message,500); }
+  } catch(e) {
+    return err(e.message,500);
+  }
 };
