@@ -167,7 +167,8 @@ body::before{
 .level-select.level-low{background:#F8E59B;color:#5a4300}
 .level-select.level-out{background:var(--rbg);color:#7a1c0a}
 .pantry-row{gap:.5rem}
-.pantry-row .row-text{min-width:0}
+.pantry-row .row-text{min-width:0;cursor:default}
+.pantry-name-edit{font-size:.875rem;color:var(--ink);flex:1;min-width:0;border:none;border-bottom:1.5px solid var(--accent,#4caf50);background:transparent;outline:none;padding:0;line-height:1.4;width:100%}
 .pantry-group-seg{margin-bottom:.625rem}
 .pantry-add{display:flex;flex-direction:column;gap:.625rem;margin-top:.875rem}
 .pantry-add-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;gap:.5rem;align-items:center}
@@ -384,6 +385,17 @@ body::before{
 .scan-icon svg{width:26px;height:26px}
 .scan-title{font-family:var(--serif);font-size:1.0625rem;font-weight:500;color:var(--ink)}
 .scan-sub{font-size:.8rem;color:var(--ink2);text-align:center;line-height:1.55}
+
+/* ── BOTTOM SHEET ───────────────────────────────────── */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;backdrop-filter:blur(2px)}
+.bottom-sheet{position:fixed;bottom:0;left:0;right:0;z-index:201;background:var(--white);border-radius:1.25rem 1.25rem 0 0;padding:1rem 1.25rem 2rem;display:flex;flex-direction:column;gap:.875rem;transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.72,0,1)}
+.bottom-sheet.open{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto -.25rem}
+.sheet-title{font-family:var(--serif);font-size:1rem;font-weight:500;color:var(--ink);text-align:center}
+.sheet-field{display:flex;flex-direction:column;gap:.35rem}
+.sheet-label{font-size:.75rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em}
+.shop-group-seg{margin-bottom:.5rem}
+#shopping-list .row > div[onclick]{cursor:pointer}
 
 /* ── BACK BTN ───────────────────────────────────────── */
 .back-btn{display:inline-flex;align-items:center;gap:.3rem;color:var(--g);font-size:.8rem;font-weight:600;margin-bottom:0}

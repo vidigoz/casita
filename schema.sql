@@ -47,8 +47,10 @@ CREATE TABLE IF NOT EXISTS shopping_list (
   source TEXT DEFAULT 'user',
   reason TEXT,
   done BOOLEAN DEFAULT FALSE,
+  store_group TEXT DEFAULT NULL,
   added_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE shopping_list ADD COLUMN IF NOT EXISTS store_group TEXT DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_shopping ON shopping_list(user_id);
 
 CREATE TABLE IF NOT EXISTS meals_history (

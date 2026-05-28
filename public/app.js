@@ -415,37 +415,61 @@ async function loadShoppingList() {
   } catch(e) { console.error(e); }
 }
 
+let shopGroupBy = 'none';
+let _shopItems = [];
+
+function setShopGroup(mode, btn) {
+  shopGroupBy = mode;
+  document.querySelectorAll('.shop-group-seg .seg-btn').forEach(b => b.classList.remove('on'));
+  btn?.classList.add('on');
+  renderShopping(_shopItems);
+}
+
 function renderShopping(items) {
+  _shopItems = items;
   const el = document.getElementById('shopping-list');
   const pending = items.filter(i => !i.done);
   const done = items.filter(i => i.done);
 
   if (!items.length) {
-    el.innerHTML = '<div class="empty"><h3>Lista vacía</h3><p>Dile a Casita "necesito X" o agrégalo abajo</p></div>';
+    el.innerHTML = '<div class="card" style="padding:.5rem 1.1rem"><div class="empty"><h3>Lista vacía</h3><p>Dile a Casita "necesito X" o agrégalo abajo</p></div></div>';
     return;
   }
 
   const shopRow = i => `
     <div class="row" id="shop-${i.id}">
       <div class="chk chk-sq ${i.done?'done':''}" onclick="toggleShop(${i.id},${!i.done})"></div>
-      <div style="flex:1">
+      <div style="flex:1;min-width:0" onclick="openShopEdit(${i.id})">
         <div class="row-text ${i.done?'done':''}">${esc(i.name)}</div>
-        ${i.reason&&i.source==='ai_suggestion'?`<div class="row-sub">${esc(i.reason)}</div>`:''}
+        ${i.store_group&&shopGroupBy!=='store'?`<div class="row-sub">${esc(i.store_group)}</div>`:''}
+        ${i.reason&&i.source==='ai_suggestion'&&!i.store_group?`<div class="row-sub">${esc(i.reason)}</div>`:''}
       </div>
-      ${i.quantity?`<span class="row-sub">${esc(i.quantity)}</span>`:''}
+      ${i.quantity?`<span class="row-sub" style="flex-shrink:0;margin-right:.25rem">${esc(i.quantity)}</span>`:''}
       <button class="del-btn" onclick="delShop(${i.id})">×</button>
     </div>`;
 
-  let html = '';
+  const grouped = (list, keyFn, fallback) => {
+    const groups = {};
+    list.forEach(i => { const k = keyFn(i) || fallback; if (!groups[k]) groups[k] = []; groups[k].push(i); });
+    return groups;
+  };
 
+  const renderGroups = (groups) =>
+    Object.entries(groups).map(([g, gitems]) =>
+      `<div class="slabel">${esc(g)}</div><div class="card" style="padding:.5rem 1.1rem">${gitems.map(shopRow).join('')}</div>`
+    ).join('');
+
+  let html = '';
   if (pending.length) {
-    html += `
-      <div class="slabel">por comprar</div>
-      <div class="card" style="padding:.5rem 1.1rem">${pending.map(shopRow).join('')}</div>`;
+    if (shopGroupBy === 'category') {
+      html += renderGroups(grouped(pending, i => i.category, 'otros'));
+    } else if (shopGroupBy === 'store') {
+      html += renderGroups(grouped(pending, i => i.store_group, 'sin tienda'));
+    } else {
+      html += `<div class="card" style="padding:.5rem 1.1rem">${pending.map(shopRow).join('')}</div>`;
+    }
   } else {
-    html += `
-      <div class="slabel">por comprar</div>
-      <div class="card" style="padding:.5rem 1.1rem"><div class="empty" style="padding:1.25rem 0"><p>Mandado completo ✓</p></div></div>`;
+    html += `<div class="card" style="padding:.5rem 1.1rem"><div class="empty" style="padding:1.25rem 0"><p>Mandado completo ✓</p></div></div>`;
   }
 
   if (done.length) {
@@ -458,6 +482,40 @@ function renderShopping(items) {
   }
 
   el.innerHTML = html;
+}
+
+let _shopEditId = null;
+function openShopEdit(id) {
+  const item = _shopItems.find(i => i.id === id);
+  if (!item) return;
+  _shopEditId = id;
+  document.getElementById('shop-edit-name').value = item.name || '';
+  document.getElementById('shop-edit-cat').value = item.category || '';
+  document.getElementById('shop-edit-store').value = item.store_group || '';
+  document.getElementById('shop-edit-overlay').classList.remove('hidden');
+  document.getElementById('shop-edit-sheet').classList.remove('hidden');
+  setTimeout(() => document.getElementById('shop-edit-sheet').classList.add('open'), 10);
+}
+
+function closeShopEdit() {
+  document.getElementById('shop-edit-sheet').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('shop-edit-overlay').classList.add('hidden');
+    document.getElementById('shop-edit-sheet').classList.add('hidden');
+  }, 280);
+}
+
+async function saveShopEdit() {
+  if (!_shopEditId) return;
+  const name = document.getElementById('shop-edit-name').value.trim();
+  const category = document.getElementById('shop-edit-cat').value || null;
+  const store_group = document.getElementById('shop-edit-store').value.trim() || null;
+  if (!name) { toast('El nombre no puede estar vacío'); return; }
+  try {
+    await api('shopping', {method:'POST', body:{action:'update', id:_shopEditId, name, category, store_group}});
+    closeShopEdit();
+    loadShoppingList();
+  } catch(e) { toast(e.message); }
 }
 
 function guessCategory(name) {
@@ -576,12 +634,47 @@ function renderPantryRow(it) {
   return `
     <div class="row pantry-row" id="pantry-${it.id}">
       <div class="dot ${meta.dot}"></div>
-      <span class="row-text">${esc(it.name)}</span>
+      <span class="row-text" title="Mantén presionado para editar" ondblclick="startEditPantryName(${it.id},this)" ontouchstart="pantryLongPress(${it.id},this,event)" ontouchend="pantryLongPressCancel()" ontouchmove="pantryLongPressCancel()">${esc(it.name)}</span>
       <select class="level-select ${meta.select}" onchange="updatePantryLevel(${it.id},this.value)">
         ${PANTRY_LEVELS.map(level=>`<option value="${level}" ${it.level===level?'selected':''}>${level}</option>`).join('')}
       </select>
       <button class="del-btn" onclick="deletePantry(${it.id})" aria-label="Eliminar ${esc(it.name)}">×</button>
     </div>`;
+}
+
+let _pantryLongPressTimer = null;
+function pantryLongPress(id, span, e) {
+  e.preventDefault();
+  _pantryLongPressTimer = setTimeout(() => { startEditPantryName(id, span); }, 600);
+}
+function pantryLongPressCancel() {
+  clearTimeout(_pantryLongPressTimer);
+}
+
+function startEditPantryName(id, span) {
+  const current = span.textContent;
+  const inp = document.createElement('input');
+  inp.className = 'pantry-name-edit';
+  inp.value = current;
+  span.replaceWith(inp);
+  inp.focus();
+  inp.select();
+  const finish = async () => {
+    const newName = inp.value.trim();
+    if (newName && newName !== current) {
+      try {
+        await api('pantry', {method:'POST', body:{action:'update', id, name:newName}});
+        await loadPantry();
+        return;
+      } catch(e) { toast(e.message); }
+    }
+    inp.replaceWith(span);
+  };
+  inp.addEventListener('blur', finish);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { inp.blur(); }
+    if (e.key === 'Escape') { inp.removeEventListener('blur', finish); inp.replaceWith(span); }
+  });
 }
 
 function setPantryGroup(group, btn) {

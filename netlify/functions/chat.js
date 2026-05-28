@@ -34,6 +34,8 @@ TOOLS DISPONIBLES — úsalas cuando aplique:
 - "queda poco X" → actualizar_despensa(nivel=poco)
 - "compré X / ya hay X" → actualizar_despensa(nivel=lleno)
 - "agrega X / necesito X / falta X" → agregar_mandado()
+- "agrega X a Costco / en HEB necesito Y" → agregar_mandado() con grupo=tienda
+- "mueve X a HEB / el pollo cómpralo en Walmart" → mover_a_grupo()
 - "recuérdame / tengo cita / hay junta" → agregar_tarea()
 - "quiero organizar / empecé un negocio / voy a hacer una fiesta" → crear_proyecto()`;
 }
@@ -64,14 +66,23 @@ const TOOLS = [
   },
   {
     name:'agregar_mandado',
-    description:'Agrega productos a la lista de compras con source=user.',
+    description:'Agrega productos a la lista de compras. Si el usuario menciona una tienda o grupo (Costco, HEB, Walmart, farmacia, etc.) úsalo en el campo grupo.',
     input_schema:{type:'object',required:['productos'],properties:{
       productos:{type:'array',items:{type:'object',required:['nombre'],properties:{
         nombre:{type:'string'},
         cantidad:{type:'string'},
         categoria:{type:'string'},
-        razon:{type:'string'}
+        razon:{type:'string'},
+        grupo:{type:'string',description:'Tienda o grupo donde comprar, ej: Costco, HEB, Walmart, farmacia'}
       }}}
+    }}
+  },
+  {
+    name:'mover_a_grupo',
+    description:'Mueve uno o varios productos ya existentes en el mandado a un grupo/tienda. Úsalo cuando el usuario diga "pon X en HEB", "mueve Y a Costco", "el pollo cómpralo en Walmart".',
+    input_schema:{type:'object',required:['productos','grupo'],properties:{
+      productos:{type:'array',items:{type:'string'},description:'Nombres de los productos a mover'},
+      grupo:{type:'string',description:'Nombre de la tienda o grupo, ej: Costco, HEB, Walmart. Usa null para quitar el grupo.'}
     }}
   },
   {
@@ -153,8 +164,19 @@ async function runTool(name, input, userId) {
   if (name === 'agregar_mandado') {
     for (const p of input.productos || []) {
       await sql`
-        INSERT INTO shopping_list(user_id,name,quantity,category,source,reason)
-        VALUES(${userId},${p.nombre},${p.cantidad||null},${p.categoria||null},'user',${p.razon||null})`;
+        INSERT INTO shopping_list(user_id,name,quantity,category,source,reason,store_group)
+        VALUES(${userId},${p.nombre},${p.cantidad||null},${p.categoria||null},'user',${p.razon||null},${p.grupo||null})`;
+    }
+    return {ok:true};
+  }
+
+  if (name === 'mover_a_grupo') {
+    const grupo = input.grupo || null;
+    for (const nombre of input.productos || []) {
+      await sql`
+        UPDATE shopping_list SET store_group=${grupo}
+        WHERE user_id=${userId} AND done=FALSE
+          AND LOWER(name) LIKE LOWER(${'%'+nombre+'%'})`;
     }
     return {ok:true};
   }

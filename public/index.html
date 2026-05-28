@@ -94,20 +94,23 @@
 
       <!-- lista de compras -->
       <div id="m-compras">
-        <div class="slabel">lo que falta comprar</div>
-        <div class="card" id="shopping-list" style="padding:.5rem 1.1rem">
-          <div class="empty"><h3>Lista vacía</h3><p>Dile a Casita "necesito X" o agrégalo abajo</p></div>
+        <div class="seg shop-group-seg">
+          <button class="seg-btn on" onclick="setShopGroup('none',this)">todo</button>
+          <button class="seg-btn" onclick="setShopGroup('category',this)">categoría</button>
+          <button class="seg-btn" onclick="setShopGroup('store',this)">tienda</button>
         </div>
-        <div class="input-row" style="border-top:none;margin-top:.25rem">
+        <div class="input-row" style="border-top:none;margin-bottom:.5rem">
           <input id="shop-input" class="ibox" placeholder='"agrega limones"' onkeydown="if(event.key==='Enter')addShopManual()">
           <button class="icon-btn" onclick="addShopManual()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
+          <button class="icon-btn" onclick="goTab('scan')" aria-label="Escanear ticket" title="Escanear ticket">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
         </div>
-        <button class="btn-ghost" id="scan-btn" onclick="goTab('scan')" style="margin-top:.25rem;width:100%;justify-content:center;display:flex;align-items:center;gap:.5rem">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          escanear ticket
-        </button>
+        <div id="shopping-list" style="padding:.5rem 0">
+          <div class="empty"><h3>Lista vacía</h3><p>Dile a Casita "necesito X" o agrégalo abajo</p></div>
+        </div>
       </div>
 
       <!-- despensa -->
@@ -265,6 +268,40 @@
     </div>
 
   </div><!-- /body -->
+
+  <!-- SHOP ITEM EDIT SHEET -->
+  <div id="shop-edit-overlay" class="sheet-overlay hidden" onclick="closeShopEdit()"></div>
+  <div id="shop-edit-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="shop-edit-title">Editar producto</div>
+    <div class="sheet-field">
+      <label class="sheet-label">Nombre</label>
+      <input id="shop-edit-name" class="ibox" type="text">
+    </div>
+    <div class="sheet-field">
+      <label class="sheet-label">Categoría</label>
+      <select id="shop-edit-cat" class="sfield" style="width:100%">
+        <option value="">— sin categoría —</option>
+        <option value="frutas">frutas</option>
+        <option value="verduras">verduras</option>
+        <option value="carnes">carnes</option>
+        <option value="lacteos">lácteos</option>
+        <option value="huevo">huevo</option>
+        <option value="pan">pan</option>
+        <option value="abarrotes">abarrotes</option>
+        <option value="limpieza">limpieza</option>
+        <option value="otros">otros</option>
+      </select>
+    </div>
+    <div class="sheet-field">
+      <label class="sheet-label">Tienda / grupo</label>
+      <input id="shop-edit-store" class="ibox" type="text" placeholder="Costco, HEB, Walmart…">
+    </div>
+    <div style="display:flex;gap:.75rem;margin-top:.25rem">
+      <button class="btn-ghost" style="flex:1" onclick="closeShopEdit()">Cancelar</button>
+      <button class="btn-primary" style="flex:2" onclick="saveShopEdit()">Guardar</button>
+    </div>
+  </div>
 
   <!-- FLOATING MIC (small, visible in all tabs except inicio and chat) -->
   <button class="fab hide" id="fab" onclick="openChatAndListen()" aria-label="Hablar con Casita">
