@@ -7,6 +7,9 @@ export const handler = async ev => {
   const userId = uid(ev); if (!userId) return err('No autenticado',401);
   const {image_base64, mime_type='image/jpeg'} = body(ev);
   if (!image_base64) return err('Falta imagen');
+  if (imageSizeBytes(image_base64) > 5 * 1024 * 1024) {
+    return err('Imagen demasiado grande. Toma la foto un poco más lejos o vuelve a intentarlo.',413);
+  }
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return err('Sin API key',500);
 
@@ -71,5 +74,16 @@ Solo incluye los ids que claramente fueron comprados. Si no hay matches, respond
     }
 
     return ok({parsed,items_added:added});
-  } catch(e) { return err(e.message,500); }
+  } catch(e) {
+    if (/image exceeds 5 MB maximum/i.test(e.message || '')) {
+      return err('Imagen demasiado grande. Toma la foto un poco más lejos o vuelve a intentarlo.',413);
+    }
+    return err(e.message,500);
+  }
 };
+
+function imageSizeBytes(base64) {
+  const clean = String(base64).replace(/\s/g,'');
+  const padding = clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0;
+  return Math.floor(clean.length * 3 / 4) - padding;
+}
