@@ -130,9 +130,10 @@ async function runTool(name, input, userId) {
         last_updated=NOW()`;
 
     if (input.nivel === 'poco' || input.nivel === 'agotado') {
+      const price = await knownPrice(userId, input.nombre);
       await sql`
-        INSERT INTO shopping_list(user_id,name,category,source,reason)
-        VALUES(${userId},${input.nombre},${input.categoria||null},'ai_suggestion',${input.nivel==='agotado'?'se agotó':'queda poco'})`;
+        INSERT INTO shopping_list(user_id,name,category,source,reason,estimated_price)
+        VALUES(${userId},${input.nombre},${input.categoria||null},'ai_suggestion',${input.nivel==='agotado'?'se agotó':'queda poco'},${price})`;
     }
     return {ok:true};
   }
@@ -151,9 +152,10 @@ async function runTool(name, input, userId) {
           last_updated=NOW()`;
 
       if (ing.nivel_nuevo === 'poco' || ing.nivel_nuevo === 'agotado') {
+        const price = await knownPrice(userId, ing.nombre);
         await sql`
-          INSERT INTO shopping_list(user_id,name,category,source,reason)
-          VALUES(${userId},${ing.nombre},${ing.categoria||null},'ai_suggestion',${ing.nivel_nuevo==='agotado'?'se agotó':'queda poco'})`;
+          INSERT INTO shopping_list(user_id,name,category,source,reason,estimated_price)
+          VALUES(${userId},${ing.nombre},${ing.categoria||null},'ai_suggestion',${ing.nivel_nuevo==='agotado'?'se agotó':'queda poco'},${price})`;
       }
     }
 
@@ -163,9 +165,10 @@ async function runTool(name, input, userId) {
 
   if (name === 'agregar_mandado') {
     for (const p of input.productos || []) {
+      const price = await knownPrice(userId, p.nombre);
       await sql`
-        INSERT INTO shopping_list(user_id,name,quantity,category,source,reason,store_group)
-        VALUES(${userId},${p.nombre},${p.cantidad||null},${p.categoria||null},'user',${p.razon||null},${p.grupo||null})`;
+        INSERT INTO shopping_list(user_id,name,quantity,category,source,reason,store_group,estimated_price)
+        VALUES(${userId},${p.nombre},${p.cantidad||null},${p.categoria||null},'user',${p.razon||null},${p.grupo||null},${price})`;
     }
     return {ok:true};
   }
@@ -220,6 +223,7 @@ export const handler = async ev => {
   if (!apiKey) return err('Sin API key',500);
 
   try {
+    await ensurePriceMemory();
     const client = new Anthropic({apiKey});
     const userRows = await sql`SELECT casita_name,household_size,city FROM users WHERE id=${userId}`;
     const system = buildSystemPrompt(userRows[0] || {});
@@ -265,3 +269,37 @@ export const handler = async ev => {
     return err(e.message,500);
   }
 };
+
+async function ensurePriceMemory() {
+  await sql`ALTER TABLE shopping_list ADD COLUMN IF NOT EXISTS estimated_price NUMERIC(10,2) DEFAULT NULL`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_prices (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      product_key TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      last_price NUMERIC(10,2) NOT NULL,
+      last_store TEXT,
+      source TEXT DEFAULT 'receipt',
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, product_key)
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_product_prices ON product_prices(user_id, product_key)`;
+}
+
+async function knownPrice(userId, name) {
+  const key = productKey(name);
+  if (!key) return null;
+  const rows = await sql`SELECT last_price FROM product_prices WHERE user_id=${userId} AND product_key=${key} LIMIT 1`;
+  return rows[0]?.last_price || null;
+}
+
+function productKey(name) {
+  return String(name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim()
+    .replace(/\s+/g,' ');
+}

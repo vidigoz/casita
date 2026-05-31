@@ -1,8 +1,8 @@
 /* ============================================================
    Casita — app.js
-   v0.0.8
+   v0.0.10
    ============================================================ */
-const APP_VERSION = 'v0.0.8';
+const APP_VERSION = 'v0.0.10';
 
 // ── Storage ─────────────────────────────────────────────────
 const S = {
@@ -430,6 +430,8 @@ function renderShopping(items) {
   const el = document.getElementById('shopping-list');
   const pending = items.filter(i => !i.done);
   const done = items.filter(i => i.done);
+  const pendingTotal = pending.reduce((sum, i) => sum + priceValue(i.estimated_price), 0);
+  const pricedCount = pending.filter(i => priceValue(i.estimated_price) > 0).length;
 
   if (!items.length) {
     el.innerHTML = '<div class="card" style="padding:.5rem 1.1rem"><div class="empty"><h3>Lista vacía</h3><p>Dile a Casita "necesito X" o agrégalo abajo</p></div></div>';
@@ -444,6 +446,7 @@ function renderShopping(items) {
         ${i.store_group&&shopGroupBy!=='store'?`<div class="row-sub">${esc(i.store_group)}</div>`:''}
         ${i.reason&&i.source==='ai_suggestion'&&!i.store_group?`<div class="row-sub">${esc(i.reason)}</div>`:''}
       </div>
+      ${priceValue(i.estimated_price)>0?`<span class="row-sub" style="flex-shrink:0;color:var(--g);font-weight:600;margin-right:.25rem">${money(i.estimated_price)}</span>`:''}
       ${i.quantity?`<span class="row-sub" style="flex-shrink:0;margin-right:.25rem">${esc(i.quantity)}</span>`:''}
       <button class="del-btn" onclick="delShop(${i.id})">×</button>
     </div>`;
@@ -461,10 +464,22 @@ function renderShopping(items) {
 
   let html = '';
   if (pending.length) {
+    html += `<div class="card card-green" style="padding:.75rem 1rem;margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem">
+        <span class="row-sub" style="white-space:normal">estimado del mandado</span>
+        <span style="font-family:var(--serif);font-size:1.2rem;color:var(--g);font-weight:500">${money(pendingTotal)}</span>
+      </div>
+      <div class="row-sub" style="margin-top:.2rem">${pricedCount} con precio · ${pending.length-pricedCount} sin precio</div>
+    </div>`;
     if (shopGroupBy === 'category') {
       html += renderGroups(grouped(pending, i => i.category, 'otros'));
     } else if (shopGroupBy === 'store') {
       html += renderGroups(grouped(pending, i => i.store_group, 'sin tienda'));
+    } else if (shopGroupBy === 'price') {
+      const withPrice = pending.filter(i => priceValue(i.estimated_price) > 0).sort((a,b) => priceValue(b.estimated_price) - priceValue(a.estimated_price));
+      const withoutPrice = pending.filter(i => priceValue(i.estimated_price) <= 0);
+      if (withPrice.length) html += `<div class="slabel">con precio · mayor a menor</div><div class="card" style="padding:.5rem 1.1rem">${withPrice.map(shopRow).join('')}</div>`;
+      if (withoutPrice.length) html += `<div class="slabel">sin precio</div><div class="card" style="padding:.5rem 1.1rem">${withoutPrice.map(shopRow).join('')}</div>`;
     } else {
       html += `<div class="card" style="padding:.5rem 1.1rem">${pending.map(shopRow).join('')}</div>`;
     }
@@ -492,6 +507,7 @@ function openShopEdit(id) {
   document.getElementById('shop-edit-name').value = item.name || '';
   document.getElementById('shop-edit-cat').value = item.category || '';
   document.getElementById('shop-edit-store').value = item.store_group || '';
+  document.getElementById('shop-edit-price').value = priceValue(item.estimated_price) > 0 ? priceValue(item.estimated_price).toFixed(2) : '';
   document.getElementById('shop-edit-overlay').classList.remove('hidden');
   document.getElementById('shop-edit-sheet').classList.remove('hidden');
   setTimeout(() => document.getElementById('shop-edit-sheet').classList.add('open'), 10);
@@ -510,12 +526,27 @@ async function saveShopEdit() {
   const name = document.getElementById('shop-edit-name').value.trim();
   const category = document.getElementById('shop-edit-cat').value || null;
   const store_group = document.getElementById('shop-edit-store').value.trim() || null;
+  const estimated_price = parsePrice(document.getElementById('shop-edit-price').value);
   if (!name) { toast('El nombre no puede estar vacío'); return; }
   try {
-    await api('shopping', {method:'POST', body:{action:'update', id:_shopEditId, name, category, store_group}});
+    await api('shopping', {method:'POST', body:{action:'update', id:_shopEditId, name, category, store_group, estimated_price}});
     closeShopEdit();
     loadShoppingList();
   } catch(e) { toast(e.message); }
+}
+
+function priceValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function parsePrice(value) {
+  const n = Number(String(value || '').replace(',','.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function money(value) {
+  return `$${priceValue(value).toFixed(2)}`;
 }
 
 function guessCategory(name) {
@@ -1405,7 +1436,8 @@ function renderScanResult(d) {
 function resetScan() {
   document.getElementById('scan-initial').classList.remove('hidden');
   document.getElementById('scan-result').classList.add('hidden');
-  document.getElementById('receipt-file').value='';
+  document.getElementById('receipt-camera-file').value='';
+  document.getElementById('receipt-gallery-file').value='';
 }
 
 const RECEIPT_MAX_BYTES = 4.5 * 1024 * 1024;

@@ -98,6 +98,7 @@
           <button class="seg-btn on" onclick="setShopGroup('none',this)">todo</button>
           <button class="seg-btn" onclick="setShopGroup('category',this)">categoría</button>
           <button class="seg-btn" onclick="setShopGroup('store',this)">tienda</button>
+          <button class="seg-btn" onclick="setShopGroup('price',this)">precio</button>
         </div>
         <div class="input-row" style="border-top:none;margin-bottom:.5rem">
           <input id="shop-input" class="ibox" placeholder='"agrega limones"' onkeydown="if(event.key==='Enter')addShopManual()">
@@ -250,12 +251,17 @@
       </button>
       <div class="slabel">escanear ticket</div>
       <div id="scan-initial">
-        <div class="scan-zone" onclick="document.getElementById('receipt-file').click()">
+        <div class="scan-zone" onclick="document.getElementById('receipt-camera-file').click()">
           <div class="scan-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
-          <div class="scan-title">Fotografía tu ticket</div>
-          <div class="scan-sub">Casita lee los productos y actualiza tu despensa automáticamente. Funciona con tickets de Walmart, HEB, Soriana, Chedraui y mercados.</div>
+          <div class="scan-title">Escanea tu ticket</div>
+          <div class="scan-sub">Toma una foto nueva o carga una imagen guardada. Casita lee los productos y actualiza tu despensa automáticamente.</div>
         </div>
-        <input type="file" id="receipt-file" accept="image/*" capture="environment" class="hidden" onchange="scanReceipt(event)">
+        <div style="display:flex;gap:.75rem;margin-top:.875rem">
+          <button class="btn-primary" style="flex:1" onclick="document.getElementById('receipt-camera-file').click()">Tomar foto</button>
+          <button class="btn-ghost" style="flex:1" onclick="document.getElementById('receipt-gallery-file').click()">Subir imagen</button>
+        </div>
+        <input type="file" id="receipt-camera-file" accept="image/*" capture="environment" class="hidden" onchange="scanReceipt(event)">
+        <input type="file" id="receipt-gallery-file" accept="image/*" class="hidden" onchange="scanReceipt(event)">
       </div>
       <div id="scan-prog" class="hidden">
         <div class="card card-tinted" style="text-align:center;padding:2rem 1rem">
@@ -296,6 +302,10 @@
     <div class="sheet-field">
       <label class="sheet-label">Tienda / grupo</label>
       <input id="shop-edit-store" class="ibox" type="text" placeholder="Costco, HEB, Walmart…">
+    </div>
+    <div class="sheet-field">
+      <label class="sheet-label">Costo estimado</label>
+      <input id="shop-edit-price" class="ibox" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
     </div>
     <div style="display:flex;gap:.75rem;margin-top:.25rem">
       <button class="btn-ghost" style="flex:1" onclick="closeShopEdit()">Cancelar</button>

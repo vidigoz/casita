@@ -48,10 +48,25 @@ CREATE TABLE IF NOT EXISTS shopping_list (
   reason TEXT,
   done BOOLEAN DEFAULT FALSE,
   store_group TEXT DEFAULT NULL,
+  estimated_price NUMERIC(10,2) DEFAULT NULL,
   added_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE shopping_list ADD COLUMN IF NOT EXISTS store_group TEXT DEFAULT NULL;
+ALTER TABLE shopping_list ADD COLUMN IF NOT EXISTS estimated_price NUMERIC(10,2) DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_shopping ON shopping_list(user_id);
+
+CREATE TABLE IF NOT EXISTS product_prices (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  product_key TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  last_price NUMERIC(10,2) NOT NULL,
+  last_store TEXT,
+  source TEXT DEFAULT 'receipt',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, product_key)
+);
+CREATE INDEX IF NOT EXISTS idx_product_prices ON product_prices(user_id, product_key);
 
 CREATE TABLE IF NOT EXISTS meals_history (
   id SERIAL PRIMARY KEY,

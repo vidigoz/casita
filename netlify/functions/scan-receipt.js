@@ -34,6 +34,8 @@ Nombre limpio: "JTOM SALAD KG" → "Jitomate". Marcas conocidas: Lala, Bimbo, La
     try { parsed = JSON.parse(text); } catch(e) { return err('No se pudo leer el ticket. Intenta con foto más clara.',422); }
 
     await sql`INSERT INTO receipts(user_id,store,total,items) VALUES(${userId},${parsed.tienda||'?'},${parsed.total||0},${JSON.stringify(parsed.productos||[])})`;
+    await ensurePriceMemory();
+    await rememberPrices(userId, parsed);
 
     // 2. Actualizar despensa
     let added = 0;
@@ -86,4 +88,51 @@ function imageSizeBytes(base64) {
   const clean = String(base64).replace(/\s/g,'');
   const padding = clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0;
   return Math.floor(clean.length * 3 / 4) - padding;
+}
+
+async function ensurePriceMemory() {
+  await sql`ALTER TABLE shopping_list ADD COLUMN IF NOT EXISTS estimated_price NUMERIC(10,2) DEFAULT NULL`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_prices (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      product_key TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      last_price NUMERIC(10,2) NOT NULL,
+      last_store TEXT,
+      source TEXT DEFAULT 'receipt',
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, product_key)
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_product_prices ON product_prices(user_id, product_key)`;
+}
+
+async function rememberPrices(userId, parsed) {
+  const store = parsed.tienda || null;
+  for (const p of (parsed.productos || [])) {
+    const name = String(p.nombre || '').trim();
+    const price = Number(p.precio);
+    if (!name || !Number.isFinite(price) || price <= 0) continue;
+    const key = productKey(name);
+    await sql`
+      INSERT INTO product_prices(user_id,product_key,product_name,last_price,last_store,source)
+      VALUES(${userId},${key},${name},${price},${store},'receipt')
+      ON CONFLICT(user_id, product_key)
+      DO UPDATE SET
+        product_name=EXCLUDED.product_name,
+        last_price=EXCLUDED.last_price,
+        last_store=EXCLUDED.last_store,
+        source='receipt',
+        updated_at=NOW()`;
+  }
+}
+
+function productKey(name) {
+  return String(name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim()
+    .replace(/\s+/g,' ');
 }
