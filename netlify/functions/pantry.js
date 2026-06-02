@@ -2,10 +2,30 @@ import { sql, ok, err, cors, body, uid } from './_lib.js';
 
 async function addToShoppingIfLow(userId, item) {
   if (!['poco','agotado'].includes(item.level)) return;
+  const reason = item.level==='agotado' ? 'se agotó' : 'queda poco';
   const price = await knownPrice(userId, item.name);
+  const existing = await pendingShoppingItemForName(userId, item.name);
+  if (existing) {
+    if (existing.source === 'ai_suggestion') {
+      await sql`
+        UPDATE shopping_list
+        SET reason=${reason},
+            category=COALESCE(category,${item.category||null}),
+            estimated_price=COALESCE(estimated_price,${price})
+        WHERE id=${existing.id} AND user_id=${userId}`;
+    }
+    return;
+  }
   await sql`
     INSERT INTO shopping_list(user_id,name,category,source,reason,estimated_price)
-    VALUES(${userId},${item.name},${item.category||null},'ai_suggestion',${item.level==='agotado'?'se agotó':'queda poco'},${price})`;
+    VALUES(${userId},${item.name},${item.category||null},'ai_suggestion',${reason},${price})`;
+}
+
+async function pendingShoppingItemForName(userId, name) {
+  const key = productKey(name);
+  if (!key) return null;
+  const rows = await sql`SELECT id,name,source FROM shopping_list WHERE user_id=${userId} AND done=FALSE`;
+  return rows.find(row => productKey(row.name) === key) || null;
 }
 
 export const handler = async ev => {

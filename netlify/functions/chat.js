@@ -37,7 +37,7 @@ TOOLS DISPONIBLES — úsalas cuando aplique:
 - "agrega X a Costco / en HEB necesito Y" → agregar_mandado() con grupo=tienda
 - "mueve X a HEB / el pollo cómpralo en Walmart" → mover_a_grupo()
 - "recuérdame / tengo cita / hay junta" → agregar_tarea()
-- "quiero organizar / empecé un negocio / voy a hacer una fiesta" → crear_proyecto()`;
+- "quiero organizar / empecé un negocio / voy a hacer una fiesta / quiero llevar mis gastos" → crear_proyecto() con el tipo correcto`;
 }
 
 const TOOLS = [
@@ -97,13 +97,22 @@ const TOOLS = [
   },
   {
     name:'crear_proyecto',
-    description:'Crea un proyecto checklist o tracker_dinero.',
+    description:`Crea uno de los 5 tipos de proyecto del hogar:
+- checklist: lista de tareas simples a palomear
+- tracker_dinero: para saldar una deuda o meta de ahorro con abonos
+- presupuesto_lista: gastos de un evento (fiesta, viaje, remodelación) con precio por ítem y palomeo
+- rutina_hogar: tareas del hogar por frecuencia (diario/semanal/mensual) para llevar el orden de la casa
+- gastos_hogar: registro mensual de gastos del hogar por categoría
+Usa el tipo que mejor corresponda según lo que dice la usuaria.`,
     input_schema:{type:'object',required:['tipo','titulo'],properties:{
-      tipo:{type:'string',enum:['checklist','tracker_dinero']},
+      tipo:{type:'string',enum:['checklist','tracker_dinero','presupuesto_lista','rutina_hogar','gastos_hogar']},
       titulo:{type:'string'},
-      items:{type:'array',items:{type:'string'},description:'Para checklist: tareas iniciales'},
-      meta_total:{type:'number',description:'Para tracker_dinero: monto total'},
-      descripcion:{type:'string'}
+      descripcion:{type:'string'},
+      items:{type:'array',items:{type:'string'},description:'Para checklist: tareas iniciales. Para presupuesto_lista: nombres de ítems iniciales.'},
+      precios:{type:'array',items:{type:'number'},description:'Para presupuesto_lista: precios correspondientes a cada ítem en items[]'},
+      meta_total:{type:'number',description:'Para tracker_dinero: monto total de la deuda o meta'},
+      presupuesto_mes:{type:'number',description:'Para gastos_hogar: presupuesto mensual total'},
+      tareas_rutina:{type:'array',items:{type:'object',properties:{texto:{type:'string'},frecuencia:{type:'string',enum:['diario','semanal','mensual']}}},description:'Para rutina_hogar: tareas iniciales con su frecuencia'}
     }}
   }
 ];
@@ -129,12 +138,11 @@ async function runTool(name, input, userId) {
         approx_quantity=COALESCE(EXCLUDED.approx_quantity,pantry.approx_quantity),
         last_updated=NOW()`;
 
-    if (input.nivel === 'poco' || input.nivel === 'agotado') {
-      const price = await knownPrice(userId, input.nombre);
-      await sql`
-        INSERT INTO shopping_list(user_id,name,category,source,reason,estimated_price)
-        VALUES(${userId},${input.nombre},${input.categoria||null},'ai_suggestion',${input.nivel==='agotado'?'se agotó':'queda poco'},${price})`;
-    }
+    await addToShoppingIfLow(userId, {
+      name: input.nombre,
+      category: input.categoria || null,
+      level: input.nivel
+    });
     return {ok:true};
   }
 
@@ -151,12 +159,11 @@ async function runTool(name, input, userId) {
           level=EXCLUDED.level,
           last_updated=NOW()`;
 
-      if (ing.nivel_nuevo === 'poco' || ing.nivel_nuevo === 'agotado') {
-        const price = await knownPrice(userId, ing.nombre);
-        await sql`
-          INSERT INTO shopping_list(user_id,name,category,source,reason,estimated_price)
-          VALUES(${userId},${ing.nombre},${ing.categoria||null},'ai_suggestion',${ing.nivel_nuevo==='agotado'?'se agotó':'queda poco'},${price})`;
-      }
+      await addToShoppingIfLow(userId, {
+        name: ing.nombre,
+        category: ing.categoria || null,
+        level: ing.nivel_nuevo
+      });
     }
 
     await invalidateRecipeCache(userId);
@@ -192,14 +199,25 @@ async function runTool(name, input, userId) {
   }
 
   if (name === 'crear_proyecto') {
-    const data = {
-      tipo: input.tipo,
-      descripcion: input.descripcion || '',
-      items: input.items || [],
-      meta_total: input.meta_total || null,
-      checked: {},
-      abonos: []
-    };
+    let data = { tipo: input.tipo, descripcion: input.descripcion || '' };
+
+    if (input.tipo === 'checklist') {
+      data.items = input.items || [];
+      data.checked = {};
+    } else if (input.tipo === 'tracker_dinero') {
+      data.meta_total = input.meta_total || 0;
+      data.abonos = [];
+    } else if (input.tipo === 'presupuesto_lista') {
+      const textos = input.items || [];
+      const precios = input.precios || [];
+      data.items = textos.map((t, i) => ({id: Date.now()+i, texto: t, precio: precios[i]||0, pagado: false}));
+    } else if (input.tipo === 'rutina_hogar') {
+      data.tareas = (input.tareas_rutina || []).map((t, i) => ({id: Date.now()+i, texto: t.texto, frecuencia: t.frecuencia||'semanal', hecha: false, ultima: null}));
+    } else if (input.tipo === 'gastos_hogar') {
+      data.presupuesto_mes = input.presupuesto_mes || 0;
+      data.gastos = [];
+    }
+
     await sql`
       INSERT INTO projects(user_id,title,type,data)
       VALUES(${userId},${input.titulo},${input.tipo},${JSON.stringify(data)})`;
@@ -292,6 +310,34 @@ async function knownPrice(userId, name) {
   if (!key) return null;
   const rows = await sql`SELECT last_price FROM product_prices WHERE user_id=${userId} AND product_key=${key} LIMIT 1`;
   return rows[0]?.last_price || null;
+}
+
+async function addToShoppingIfLow(userId, item) {
+  if (!['poco','agotado'].includes(item.level)) return;
+  const reason = item.level==='agotado' ? 'se agotó' : 'queda poco';
+  const price = await knownPrice(userId, item.name);
+  const existing = await pendingShoppingItemForName(userId, item.name);
+  if (existing) {
+    if (existing.source === 'ai_suggestion') {
+      await sql`
+        UPDATE shopping_list
+        SET reason=${reason},
+            category=COALESCE(category,${item.category||null}),
+            estimated_price=COALESCE(estimated_price,${price})
+        WHERE id=${existing.id} AND user_id=${userId}`;
+    }
+    return;
+  }
+  await sql`
+    INSERT INTO shopping_list(user_id,name,category,source,reason,estimated_price)
+    VALUES(${userId},${item.name},${item.category||null},'ai_suggestion',${reason},${price})`;
+}
+
+async function pendingShoppingItemForName(userId, name) {
+  const key = productKey(name);
+  if (!key) return null;
+  const rows = await sql`SELECT id,name,source FROM shopping_list WHERE user_id=${userId} AND done=FALSE`;
+  return rows.find(row => productKey(row.name) === key) || null;
 }
 
 function productKey(name) {

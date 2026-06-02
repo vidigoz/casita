@@ -74,8 +74,15 @@ export const handler = async ev => {
     }
     if (b.action==='update_profile') {
       const userId = parseInt((ev.headers||{})['x-user-id']||0,10);
-      if (!userId) return err('No autenticado',401);
-      const r = await sql`UPDATE users SET casita_name=COALESCE(${b.casita_name||null},casita_name), household_size=COALESCE(${b.household_size||null},household_size), city=COALESCE(${b.city||null},city) WHERE id=${userId} RETURNING id,email,casita_name,household_size,city`;
+      const email = (b.email||'').toLowerCase().trim();
+      if (!userId && !email) return err('No autenticado',401);
+      const casitaName = String(b.casita_name || '').trim() || null;
+      const householdSize = parseInt(b.household_size, 10) || null;
+      const city = String(b.city || '').trim() || null;
+      const r = email
+        ? await sql`UPDATE users SET casita_name=COALESCE(${casitaName},casita_name), household_size=COALESCE(${householdSize},household_size), city=COALESCE(${city},city) WHERE email=${email} RETURNING id,email,casita_name,household_size,city`
+        : await sql`UPDATE users SET casita_name=COALESCE(${casitaName},casita_name), household_size=COALESCE(${householdSize},household_size), city=COALESCE(${city},city) WHERE id=${userId} RETURNING id,email,casita_name,household_size,city`;
+      if (!r.length) return err('No encontré esa cuenta',404);
       return ok({user:r[0]});
     }
     return err('Acción desconocida');

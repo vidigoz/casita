@@ -18,3 +18,6 @@
 [dev]
   publish = "public"
   port = 8888
+
+[functions."push-notify"]
+  schedule = "*/15 * * * *"

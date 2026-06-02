@@ -32,11 +32,13 @@
         <div class="brand-sub" id="hdr-sub">tu asistente del hogar</div>
       </div>
     </div>
-    <button class="hdr-btn" id="settings-btn" onclick="goTab('ajustes')" aria-label="Configuración">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-    </button>
+    <div class="hdr-actions">
+      <button class="hdr-btn" id="settings-btn" onclick="goTab('ajustes')" aria-label="Configuración">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <div class="body" id="body">
@@ -44,14 +46,24 @@
     <!-- ── INICIO ── -->
     <div class="page active" id="pg-inicio">
       <div class="greeting">
-        <h1 id="greet-h1">Hola</h1>
-        <p id="greet-date"></p>
+        <div class="greeting-copy">
+          <h1 id="greet-h1">Hola</h1>
+          <p id="greet-date"></p>
+        </div>
+        <button class="big-mic welcome-mic" id="big-mic-btn" onclick="openChatAndListen()" aria-label="Hablar con Casita">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
       </div>
       <div id="weather-card" class="card weather-card">
         <div class="weather-temp" id="w-temp">—°</div>
         <div class="weather-info">
           <div class="weather-city" id="w-city">—</div>
           <div class="weather-desc" id="w-desc">cargando clima...</div>
+          <div class="weather-advice" id="w-advice"></div>
         </div>
         <div class="weather-alert" id="w-alert"></div>
       </div>
@@ -59,29 +71,45 @@
       <div class="card" id="inicio-tasks" style="padding:.5rem 1.1rem">
         <div class="empty"><p>Cargando...</p></div>
       </div>
-      <div class="big-mic-area">
-        <button class="big-mic" id="big-mic-btn" onclick="openChatAndListen()" aria-label="Hablar con Casita">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-        <div class="big-mic-hint">toca para hablarle a Casita</div>
+      <div class="slabel">mandado y despensa</div>
+      <div class="card home-market-card" id="inicio-market">
+        <div class="empty"><p>Cargando mandado...</p></div>
+      </div>
+      <div class="slabel">qué cocinar</div>
+      <div class="card home-recipe-card" id="inicio-cocinar">
+        <div class="empty"><p>Buscando ideas...</p></div>
       </div>
     </div>
 
     <!-- ── PENDIENTES ── -->
     <div class="page" id="pg-pendientes">
-      <div class="slabel">pendientes</div>
-      <div id="tasks-list" style="display:flex;flex-direction:column;gap:.75rem">
-        <div class="empty"><h3>Sin pendientes</h3><p>Dile a Casita "recuérdame X" y aparecerá aquí</p></div>
+      <div class="seg">
+        <button class="seg-btn on" onclick="swPendientes('lista',this)">lista</button>
+        <button class="seg-btn" onclick="swPendientes('calendario',this)">calendario</button>
       </div>
-      <div class="input-row" style="padding-top:.875rem;border-top:none;margin-top:-.25rem">
-        <input id="task-input" class="ibox" placeholder='"cita del dentista viernes 3pm"' onkeydown="if(event.key==='Enter')addTaskManual()">
-        <button class="icon-btn" onclick="addTaskManual()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
+      <div id="pend-lista">
+        <div id="tasks-list" style="display:flex;flex-direction:column;gap:.75rem">
+          <div class="empty"><h3>Sin pendientes</h3><p>Dile a Casita "recuérdame X" y aparecerá aquí</p></div>
+        </div>
+        <div class="input-row" style="padding-top:.875rem;border-top:none;margin-top:-.25rem">
+          <input id="task-input" class="ibox" placeholder='"cita del dentista viernes 3pm"' onkeydown="if(event.key==='Enter')addTaskManual()">
+          <button class="icon-btn" onclick="addTaskManual()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="pend-calendario" class="hidden">
+        <div id="cal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <button class="icon-btn" onclick="calNav(-1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span id="cal-mes" style="font-family:var(--serif);font-size:1rem;font-weight:500"></span>
+          <button class="icon-btn" onclick="calNav(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div id="cal-grid"></div>
+        <div id="cal-day-tasks" style="margin-top:.75rem;display:flex;flex-direction:column;gap:.5rem"></div>
       </div>
     </div>
 
@@ -184,8 +212,37 @@
       <div id="proj-list-view">
         <div class="slabel">mis proyectos</div>
         <div id="projects-list" class="card" style="padding:0">
-          <div class="empty"><h3>Sin proyectos</h3><p>Dile a Casita "quiero organizar una fiesta" o "empecé un negocio" y ella crea la herramienta</p></div>
+          <div class="empty"><h3>Sin proyectos</h3><p>Dile a Casita "quiero organizar una fiesta" o toca el botón de abajo para ver qué puedes crear</p></div>
         </div>
+        <div class="slabel" style="margin-top:1.25rem">¿qué puedo crear?</div>
+        <div class="proj-tipos-grid">
+          <div class="proj-tipo-card" onclick="iniciarProyectoDesdeChat('Hola Casita, quiero crear una lista de tareas')">
+            <div class="proj-tipo-icon">✓</div>
+            <div class="proj-tipo-nombre">Lista de tareas</div>
+            <div class="proj-tipo-desc">Anota lo que tienes que hacer y ve palomeando conforme avanzas. Para cualquier proyecto simple.</div>
+          </div>
+          <div class="proj-tipo-card" onclick="iniciarProyectoDesdeChat('Hola Casita, quiero llevar el control de una deuda o ahorro')">
+            <div class="proj-tipo-icon">$</div>
+            <div class="proj-tipo-nombre">Control de deudas</div>
+            <div class="proj-tipo-desc">Lleva el registro de lo que debes o quieres ahorrar. Ve abonando poco a poco hasta saldar la cuenta.</div>
+          </div>
+          <div class="proj-tipo-card" onclick="iniciarProyectoDesdeChat('Hola Casita, quiero hacer un presupuesto con lista de gastos para un evento')">
+            <div class="proj-tipo-icon">🎉</div>
+            <div class="proj-tipo-nombre">Presupuesto con lista</div>
+            <div class="proj-tipo-desc">Para fiestas, viajes o remodelaciones. Agrega cada gasto con su precio y palomea lo que ya cubriste.</div>
+          </div>
+          <div class="proj-tipo-card" onclick="iniciarProyectoDesdeChat('Hola Casita, quiero organizar la rutina de limpieza de mi casa')">
+            <div class="proj-tipo-icon">🧹</div>
+            <div class="proj-tipo-nombre">Rutina del hogar</div>
+            <div class="proj-tipo-desc">Organiza las tareas de la casa por frecuencia: diario, semanal o mensual. Nunca se te olvida nada.</div>
+          </div>
+          <div class="proj-tipo-card" style="grid-column:1/-1" onclick="iniciarProyectoDesdeChat('Hola Casita, quiero llevar el control de los gastos de mi hogar este mes')">
+            <div class="proj-tipo-icon">📊</div>
+            <div class="proj-tipo-nombre">Gastos del hogar</div>
+            <div class="proj-tipo-desc">Registra todos los gastos del mes por categoría y ve cuánto llevas gastado contra tu presupuesto.</div>
+          </div>
+        </div>
+        <p style="font-size:.75rem;color:var(--ink3);text-align:center;font-style:italic;margin-top:.25rem">Toca cualquier tarjeta y Casita te ayuda a crearlo</p>
       </div>
       <div id="proj-detail-view" class="hidden"></div>
     </div>
@@ -225,7 +282,13 @@
           <input id="s-city" class="sfield" style="width:120px">
         </div>
       </div>
-      <button class="btn-primary" onclick="saveProfile()">Guardar cambios</button>
+      <button class="btn-primary" id="profile-save-btn" onclick="handleProfileButton()">Guardar cambios</button>
+      <div class="slabel" style="margin-top:.5rem">notificaciones</div>
+      <div class="card">
+        <div id="push-status-row" style="display:flex;flex-direction:column;gap:.5rem">
+          <span style="font-size:.8rem;color:var(--ink3)">Cargando...</span>
+        </div>
+      </div>
       <div class="slabel" style="margin-top:.5rem">apariencia</div>
       <div class="card">
         <div class="seg theme-seg" id="theme-picker" role="group" aria-label="Tema visual">
@@ -276,6 +339,41 @@
   </div><!-- /body -->
 
   <!-- SHOP ITEM EDIT SHEET -->
+  <!-- TASK EDIT SHEET -->
+  <div id="task-edit-overlay" class="sheet-overlay hidden" onclick="closeTaskEdit()"></div>
+  <div id="task-edit-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Editar pendiente</div>
+    <div class="sheet-field">
+      <label class="sheet-label">Tarea</label>
+      <input id="te-titulo" class="ibox" type="text">
+    </div>
+    <div class="sheet-field">
+      <label class="sheet-label">Fecha (opcional)</label>
+      <input id="te-fecha" class="ibox" type="date">
+    </div>
+    <div class="sheet-field">
+      <label class="sheet-label">Hora (opcional)</label>
+      <input id="te-hora" class="ibox" type="time">
+    </div>
+    <div style="display:flex;gap:.75rem;margin-top:.25rem">
+      <button class="btn-ghost" style="flex:1" onclick="closeTaskEdit()">Cancelar</button>
+      <button class="btn-primary" style="flex:2" onclick="saveTaskEdit()">Guardar</button>
+    </div>
+  </div>
+
+  <!-- PROJ ENTRY EDIT SHEET -->
+  <div id="proj-edit-overlay" class="sheet-overlay hidden" onclick="closeProjEdit()"></div>
+  <div id="proj-edit-sheet" class="bottom-sheet hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="proj-edit-title">Editar entrada</div>
+    <div id="proj-edit-fields" style="display:flex;flex-direction:column;gap:.875rem"></div>
+    <div style="display:flex;gap:.75rem;margin-top:.25rem">
+      <button class="btn-ghost" style="flex:1" onclick="closeProjEdit()">Cancelar</button>
+      <button class="btn-primary" style="flex:2" onclick="saveProjEdit()">Guardar</button>
+    </div>
+  </div>
+
   <div id="shop-edit-overlay" class="sheet-overlay hidden" onclick="closeShopEdit()"></div>
   <div id="shop-edit-sheet" class="bottom-sheet hidden">
     <div class="sheet-handle"></div>
@@ -376,11 +474,18 @@
   </div>
 </div>
 
+<script src="/js/version.js"></script>
+<script src="/js/core.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/inicio.js"></script>
+<script src="/js/pendientes.js"></script>
+<script src="/js/mandado-despensa.js"></script>
+<script src="/js/recetas.js"></script>
+<script src="/js/proyectos.js"></script>
+<script src="/js/chat-voz.js"></script>
+<script src="/js/scan-ticket.js"></script>
+<script src="/js/ajustes.js"></script>
+<script src="/js/notificaciones.js"></script>
 <script src="/app.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js');
-  }
-</script>
 </body>
 </html>

@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  type TEXT CHECK (type IN ('checklist','tracker_dinero')) NOT NULL,
+  type TEXT CHECK (type IN ('checklist','tracker_dinero','presupuesto_lista','rutina_hogar','gastos_hogar')) NOT NULL,
   data JSONB NOT NULL DEFAULT '{}',
   archived BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
