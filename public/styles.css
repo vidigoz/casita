@@ -342,6 +342,8 @@ body::before{
 .proj-meta{font-size:.72rem;color:var(--ink3);margin-top:2px}
 .proj-pct{font-size:.875rem;font-weight:600;color:var(--g);margin-left:auto;flex-shrink:0}
 .proj-title{font-family:var(--serif);font-size:1.5rem;font-weight:500;margin-bottom:.25rem}
+.edit-title-btn{width:28px;height:28px;border-radius:50%;color:var(--ink3);opacity:.4;transition:all .15s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.edit-title-btn:hover{opacity:1;color:var(--g);background:var(--bg2)}
 .pbar{height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:.5rem}
 .pbar-fill{height:100%;border-radius:3px;background:var(--g);transition:width .4s ease}
 .pbar-fill-y{background:var(--y)}

@@ -94,6 +94,19 @@ function backBtn() {
   </button>`;
 }
 
+async function renameProject(id, currentTitle) {
+  const newTitle = prompt('Nuevo nombre del proyecto:', currentTitle);
+  if (!newTitle || newTitle.trim() === currentTitle) return;
+  await apiAuth('projects', {method:'POST', body:{id, action:'rename', title:newTitle.trim()}});
+  openProject(id);
+}
+
+function editTitleBtn(p) {
+  return `<button class="edit-title-btn" onclick="renameProject(${p.id},'${esc(p.title).replace(/'/g,"\\'")}')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+  </button>`;
+}
+
 function renderProjectDetail(p) {
   const el = document.getElementById('proj-detail-view');
   switch(p.type) {
@@ -113,7 +126,7 @@ function renderChecklist(el, p) {
   el.innerHTML = `
     ${backBtn()}
     <div>
-      <h2 class="proj-title">${esc(p.title)}</h2>
+      <div style="display:flex;align-items:center;gap:.5rem"><h2 class="proj-title">${esc(p.title)}</h2>${editTitleBtn(p)}</div>
       <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--ink2);margin:.5rem 0 .375rem">
         <span>${c}/${t} tareas</span><span style="color:var(--g);font-weight:600">${pct}%</span>
       </div>
@@ -143,7 +156,7 @@ function renderTrackerDinero(el, p) {
   const pagado=abonos.reduce((s,a)=>s+(a.monto||0),0), pct=meta?Math.min(100,Math.round(pagado/meta*100)):0;
   el.innerHTML = `
     ${backBtn()}
-    <h2 class="proj-title">${esc(p.title)}</h2>
+    <div style="display:flex;align-items:center;gap:.5rem"><h2 class="proj-title">${esc(p.title)}</h2>${editTitleBtn(p)}</div>
     <div class="stat3">
       <div class="stat-box"><div class="stat-v" style="color:var(--r)">$${(meta-pagado).toFixed(0)}</div><div class="stat-l">falta</div></div>
       <div class="stat-box"><div class="stat-v" style="color:var(--g)">$${pagado.toFixed(0)}</div><div class="stat-l">pagado</div></div>
@@ -184,7 +197,7 @@ function renderPresupuesto(el, p) {
   const t=items.length, c=items.filter(x=>x.pagado).length, pct=t?Math.round(c/t*100):0;
   el.innerHTML = `
     ${backBtn()}
-    <h2 class="proj-title">${esc(p.title)}</h2>
+    <div style="display:flex;align-items:center;gap:.5rem"><h2 class="proj-title">${esc(p.title)}</h2>${editTitleBtn(p)}</div>
     <div class="stat3">
       <div class="stat-box"><div class="stat-v" style="color:var(--r)">$${restante.toFixed(0)}</div><div class="stat-l">por pagar</div></div>
       <div class="stat-box"><div class="stat-v" style="color:var(--g)">$${gastado.toFixed(0)}</div><div class="stat-l">pagado</div></div>
@@ -238,7 +251,7 @@ function renderRutina(el, p) {
 
   el.innerHTML = `
     ${backBtn()}
-    <h2 class="proj-title">${esc(p.title)}</h2>
+    <div style="display:flex;align-items:center;gap:.5rem"><h2 class="proj-title">${esc(p.title)}</h2>${editTitleBtn(p)}</div>
     <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--ink2);margin:.5rem 0 .375rem">
       <span>${c}/${t} tareas de hoy</span><span style="color:var(--g);font-weight:600">${pct}%</span>
     </div>
@@ -272,7 +285,7 @@ function renderGastos(el, p) {
 
   el.innerHTML = `
     ${backBtn()}
-    <h2 class="proj-title">${esc(p.title)}</h2>
+    <div style="display:flex;align-items:center;gap:.5rem"><h2 class="proj-title">${esc(p.title)}</h2>${editTitleBtn(p)}</div>
     <div class="stat3">
       <div class="stat-box"><div class="stat-v" style="color:var(--r)">$${total.toFixed(0)}</div><div class="stat-l">gastado</div></div>
       <div class="stat-box"><div class="stat-v" style="color:var(--g)">$${(pres-total).toFixed(0)}</div><div class="stat-l">disponible</div></div>

@@ -181,6 +181,12 @@ export const handler = async ev => {
     }
 
     // ── GENERALES ─────────────────────────────────────────
+    if (b.action==='rename') {
+      const newTitle = (b.title||'').trim();
+      if (!newTitle) return err('Título requerido',400);
+      await sql`UPDATE projects SET title=${newTitle},updated_at=NOW() WHERE id=${id} AND user_id=${userId}`;
+      return ok({success:true});
+    }
     if (b.action==='archive') { await sql`UPDATE projects SET archived=TRUE WHERE id=${id} AND user_id=${userId}`; }
     if (b.action==='delete')  { await sql`DELETE FROM projects WHERE id=${id} AND user_id=${userId}`; }
     return ok({success:true});
