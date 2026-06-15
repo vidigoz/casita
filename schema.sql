@@ -22,8 +22,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   due_time TIME,
   category TEXT,
   done BOOLEAN DEFAULT FALSE,
+  notified BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_tasks ON tasks(user_id, due_date);
 
 CREATE TABLE IF NOT EXISTS pantry (
@@ -143,3 +145,28 @@ CREATE TABLE IF NOT EXISTS user_memory (
   UNIQUE(user_id, type, key)
 );
 CREATE INDEX IF NOT EXISTS idx_user_memory ON user_memory(user_id, type);
+
+-- Suscripciones push (notificaciones). La crea netlify/functions/push-subscribe.js.
+-- El índice único de expresión va por separado: Postgres no permite
+-- expresiones dentro de un UNIQUE constraint en CREATE TABLE.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  subscription JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_user_endpoint
+  ON push_subscriptions (user_id, md5(endpoint));
+
+-- Cache de respuestas de chat (legacy). Existe en Neon de una versión anterior;
+-- ninguna función actual la usa. Se documenta para mantener el schema fiel a la BD.
+CREATE TABLE IF NOT EXISTS chat_cache (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  message_normalized TEXT NOT NULL,
+  response TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, message_normalized)
+);
+CREATE INDEX IF NOT EXISTS idx_chat_cache ON chat_cache(user_id, message_normalized, created_at DESC);
