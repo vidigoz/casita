@@ -285,16 +285,25 @@ async function miniChatSendText(text) {
     ? `[El usuario está en la sección ${secLabel}. Solo actúa en esa sección a menos que pida explícitamente otra cosa.] ${text}`
     : text;
 
+  // Registrar en historial del chat principal
+  addBubble('user', text);
+
   try {
-    const d = await api('chat', { method: 'POST', body: { message: contextMsg, history: [] } });
-    replyEl.textContent = d.reply || '…';
+    const d = await api('chat', { method: 'POST', body: { message: contextMsg, history: chatHistory.slice(-8) } });
+    const reply = d.reply || '…';
+    replyEl.textContent = reply;
     replyEl.classList.remove('hidden');
+    // Guardar en historial con el texto original (sin prefijo de sección)
+    chatHistory.push({ role: 'user', content: text });
+    chatHistory.push({ role: 'assistant', content: reply });
+    addBubble('ai', reply);
     miniSetDot('idle');
     refreshCurrentTab();
     setTimeout(() => { if (miniChatOpen) miniStartVoice(); }, 1200);
   } catch (e) {
     replyEl.textContent = '⚠ ' + e.message;
     replyEl.classList.remove('hidden');
+    addBubble('ai', '⚠ ' + e.message);
     miniSetDot('idle');
   }
 }
