@@ -179,6 +179,15 @@
   background: linear-gradient(135deg, #D4922A, #B8501A);
   box-shadow: 0 4px 16px -2px rgba(212,146,42,.5);
 }
+:root[data-theme="nocturno"] .mini-chat {
+  background: var(--white);
+  border-color: var(--line);
+}
+:root[data-theme="nocturno"] .mini-chat-input {
+  background: var(--bg);
+  color: var(--ink);
+  border-color: var(--line);
+}
 
 /* Icon buttons */
 :root[data-theme="nocturno"] .icon-btn {
