@@ -9,7 +9,8 @@
       "Bash(node -e ' *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git -C /Users/vidigoz/casita push origin main)"
+      "Bash(git -C /Users/vidigoz/casita push origin main)",
+      "Bash(node --input-type=module -e ' *)"
     ]
   }
 }
