@@ -1,8 +1,8 @@
 // tasks.js
-import { sql, ok, err, cors, body, uid } from './_lib.js';
+import { sql, ok, err, cors, body, authUid } from './_lib.js';
 export const handler = async ev => {
   if (ev.httpMethod==='OPTIONS') return cors();
-  const userId = uid(ev); if (!userId) return err('No autenticado',401);
+  const userId = authUid(ev); if (!userId) return err('No autenticado',401);
   try {
     if (ev.httpMethod==='GET') {
       const q = ev.queryStringParameters||{};

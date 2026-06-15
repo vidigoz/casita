@@ -1,4 +1,4 @@
-import { sql, ok, err, cors, body, uid } from './_lib.js';
+import { sql, ok, err, cors, body, authUid } from './_lib.js';
 
 async function addToShoppingIfLow(userId, item) {
   if (!['poco','agotado'].includes(item.level)) return;
@@ -30,7 +30,7 @@ async function pendingShoppingItemForName(userId, name) {
 
 export const handler = async ev => {
   if (ev.httpMethod==='OPTIONS') return cors();
-  const userId = uid(ev); if (!userId) return err('No autenticado',401);
+  const userId = authUid(ev); if (!userId) return err('No autenticado',401);
   try {
     await ensurePriceMemory();
     if (ev.httpMethod==='GET') {

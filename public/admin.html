@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Casita · Admin</title>
+<style>
+  :root{
+    --bg:#F7F3EC;--card:#fff;--ink:#28261F;--ink2:#5A5849;--ink3:#908E82;
+    --line:#D8CFB8;--g:#4A6E1F;--gbg:#E6EED0;--r:#B8501A;--rbg:#F7E0D0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:1.25rem;max-width:1100px;margin:0 auto}
+  h1{font-size:1.4rem;margin-bottom:.25rem}
+  .sub{color:var(--ink3);font-size:.85rem;margin-bottom:1.25rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem}
+  /* login */
+  #login{max-width:340px;margin:15vh auto 0;text-align:center}
+  #login input{width:100%;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;font-size:1rem;margin:.75rem 0}
+  button{background:var(--g);color:#fff;border:none;border-radius:10px;padding:.7rem 1.1rem;font-size:.95rem;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.5}
+  .err{color:var(--r);font-size:.85rem;margin-top:.5rem;min-height:1rem}
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1.25rem}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.85rem 1rem}
+  .metric .n{font-size:1.7rem;font-weight:700;color:var(--g)}
+  .metric .l{font-size:.72rem;color:var(--ink3);text-transform:uppercase;letter-spacing:.03em;margin-top:.15rem}
+  .slabel{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin:1.25rem 0 .5rem}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th,td{text-align:left;padding:.55rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ink3);font-weight:600}
+  td.name{font-weight:600}
+  td.email{color:var(--ink3);font-size:.75rem}
+  .chips{display:flex;gap:3px;flex-wrap:wrap}
+  .chip{font-size:.62rem;padding:1px 6px;border-radius:20px;background:var(--gbg);color:var(--g);font-weight:600}
+  .chip.off{background:#EFEAE0;color:#B6AE9C}
+  .adopt{font-weight:700}
+  .stale{color:var(--r)}
+  .bars{display:flex;flex-direction:column;gap:.4rem}
+  .bar-row{display:flex;align-items:center;gap:.6rem;font-size:.8rem}
+  .bar-row .lab{width:90px;color:var(--ink2);text-transform:capitalize}
+  .bar-track{flex:1;height:8px;background:#EFEAE0;border-radius:6px;overflow:hidden}
+  .bar-fill{height:100%;background:var(--g3,#6B9528);background:var(--g)}
+  .bar-row .val{width:24px;text-align:right;color:var(--ink3)}
+  .wrap{overflow-x:auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center}
+  .ghost{background:none;color:var(--ink3);font-weight:500;font-size:.8rem;padding:.3rem .5rem}
+</style>
+</head>
+<body>
+
+<div id="login" class="card">
+  <h1>Casita Admin</h1>
+  <p class="sub">Panel de estadísticas</p>
+  <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrar()">
+  <button onclick="entrar()" id="btn">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="dash" style="display:none">
+  <div class="topbar">
+    <div>
+      <h1>Casita Admin</h1>
+      <p class="sub" id="genAt"></p>
+    </div>
+    <button class="ghost" onclick="salir()">Salir</button>
+  </div>
+
+  <div class="metrics" id="metrics"></div>
+
+  <div class="slabel">Uso por sección (cuántos usuarios usan cada una)</div>
+  <div class="card bars" id="bars"></div>
+
+  <div class="slabel">Usuarios</div>
+  <div class="card wrap">
+    <table id="tabla"></table>
+  </div>
+</div>
+
+<script>
+const KEY = 'casita_admin_pass';
+
+async function fetchStats(pass) {
+  const res = await fetch('/api/admin', { headers: { 'x-admin-pass': pass } });
+  if (res.status === 401) throw new Error('Contraseña incorrecta');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error');
+  return data;
+}
+
+async function entrar() {
+  const pass = document.getElementById('pass').value.trim();
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  if (!pass) { err.textContent = 'Pon la contraseña'; return; }
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  try {
+    const data = await fetchStats(pass);
+    sessionStorage.setItem(KEY, pass);
+    render(data);
+  } catch (e) {
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+
+function salir() {
+  sessionStorage.removeItem(KEY);
+  document.getElementById('dash').style.display = 'none';
+  document.getElementById('login').style.display = '';
+  document.getElementById('pass').value = '';
+}
+
+function rel(ts) {
+  if (!ts) return '<span class="stale">nunca</span>';
+  const d = (Date.now() - new Date(ts)) / 1000;
+  if (d < 3600) return 'hace ' + Math.max(1, Math.round(d/60)) + ' min';
+  if (d < 86400) return 'hace ' + Math.round(d/3600) + ' h';
+  const dias = Math.round(d/86400);
+  const txt = 'hace ' + dias + (dias === 1 ? ' día' : ' días');
+  return dias > 14 ? '<span class="stale">' + txt + '</span>' : txt;
+}
+
+function render(data) {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('dash').style.display = '';
+  document.getElementById('genAt').textContent =
+    'Generado ' + new Date(data.generado).toLocaleString('es-MX');
+
+  const g = data.global;
+  document.getElementById('metrics').innerHTML = [
+    ['Usuarios', g.total_usuarios],
+    ['Activos 7d', g.activos_7d],
+    ['Activos 30d', g.activos_30d],
+    ['Fantasmas', g.fantasmas],
+    ['Con notif.', g.con_push],
+    ['Mensajes chat', g.totales.mensajes_chat]
+  ].map(([l,n]) => `<div class="metric"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+  const maxSec = Math.max(1, ...g.conteo_secciones.map(s => s.usuarios));
+  document.getElementById('bars').innerHTML = g.conteo_secciones.map(s => `
+    <div class="bar-row">
+      <span class="lab">${s.seccion}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${(s.usuarios/maxSec*100).toFixed(0)}%"></span></span>
+      <span class="val">${s.usuarios}</span>
+    </div>`).join('');
+
+  const secciones = [
+    ['usa_pendientes','pendientes'],['usa_mandado','mandado'],['usa_despensa','despensa'],
+    ['usa_proyectos','proyectos'],['usa_recetas','recetas'],['usa_tickets','tickets'],['usa_chat','chat']
+  ];
+  const rows = data.usuarios.map(u => {
+    const chips = secciones.map(([k,lab]) =>
+      `<span class="chip ${u[k]?'':'off'}">${lab}</span>`).join('');
+    return `<tr>
+      <td class="name">${esc(u.casita_name)}<div class="email">${esc(u.email)}</div></td>
+      <td>${rel(u.last_seen)}</td>
+      <td class="adopt">${u.secciones_usadas}/${u.secciones_total}</td>
+      <td>${u.msgs_chat}</td>
+      <td><div class="chips">${chips}</div></td>
+      <td>${u.push_activo ? '🔔' : '—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tabla').innerHTML = `
+    <thead><tr>
+      <th>Usuario</th><th>Último uso</th><th>Adopción</th><th>Msgs chat</th><th>Secciones</th><th>Notif</th>
+    </tr></thead><tbody>${rows}</tbody>`;
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// Auto-entrar si ya hay contraseña en la sesión
+(async () => {
+  const saved = sessionStorage.getItem(KEY);
+  if (!saved) return;
+  try { render(await fetchStats(saved)); }
+  catch { sessionStorage.removeItem(KEY); }
+})();
+</script>
+</body>
+</html>
