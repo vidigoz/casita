@@ -44,9 +44,13 @@ async function unsubscribePush() {
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
-    if (sub) {
-      await api('push-subscribe', { method: 'POST', body: { action: 'unsubscribe', subscription: sub.toJSON() } });
-      await sub.unsubscribe();
+    if (!sub) return true;
+    const subJson = sub.toJSON();
+    await sub.unsubscribe();
+    try {
+      await api('push-subscribe', { method: 'POST', body: { action: 'unsubscribe', subscription: subJson } });
+    } catch (e) {
+      console.warn('No se pudo borrar suscripción del servidor:', e);
     }
     return true;
   } catch (e) {
