@@ -12,7 +12,8 @@
     "packageJson": {
       "dependencies": [
         "npm:@anthropic-ai/sdk@0.39",
-        "npm:@neondatabase/serverless@~0.10.4"
+        "npm:@neondatabase/serverless@~0.10.4",
+        "npm:web-push@^3.6.7"
       ]
     }
   }

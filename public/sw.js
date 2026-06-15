@@ -1,4 +1,4 @@
-const CACHE = 'casita-v1.0.1';
+const CACHE = 'casita-v1.0.3';
 const STATIC = [
   '/',
   '/styles.css',
@@ -16,6 +16,7 @@ const STATIC = [
   '/js/chat-voz.js',
   '/js/scan-ticket.js',
   '/js/ajustes.js',
+  '/js/notificaciones.js',
   '/app.js',
   '/icons/logo.png',
   '/icons/icon-192.png',

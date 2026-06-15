@@ -16,7 +16,16 @@ export const handler = async ev => {
       UNIQUE(user_id, (subscription->>'endpoint'))
     )`;
 
-  const { subscription } = body(ev);
+  const { subscription, action } = body(ev);
+
+  if (action === 'unsubscribe') {
+    if (!subscription?.endpoint) return err('Suscripción inválida', 400);
+    await sql`
+      DELETE FROM push_subscriptions
+      WHERE user_id = ${userId} AND subscription->>'endpoint' = ${subscription.endpoint}`;
+    return ok({ ok: true });
+  }
+
   if (!subscription?.endpoint) return err('Suscripción inválida', 400);
 
   await sql`

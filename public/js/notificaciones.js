@@ -12,9 +12,12 @@ async function pushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
-async function getPushPermission() {
-  if (!await pushSupported()) return 'unsupported';
-  return Notification.permission; // 'default' | 'granted' | 'denied'
+async function getActivePushSubscription() {
+  if (!await pushSupported()) return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  } catch { return null; }
 }
 
 async function subscribePush() {
@@ -23,7 +26,8 @@ async function subscribePush() {
 
   try {
     const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({
+    const existing = await reg.pushManager.getSubscription();
+    const sub = existing || await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
@@ -31,6 +35,22 @@ async function subscribePush() {
     return true;
   } catch (e) {
     console.error('subscribePush error:', e);
+    return false;
+  }
+}
+
+async function unsubscribePush() {
+  if (!await pushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await api('push-subscribe', { method: 'POST', body: { action: 'unsubscribe', subscription: sub.toJSON() } });
+      await sub.unsubscribe();
+    }
+    return true;
+  } catch (e) {
+    console.error('unsubscribePush error:', e);
     return false;
   }
 }
@@ -56,6 +76,13 @@ async function requestPushPermission() {
   renderPushStatus();
 }
 
+async function disablePush() {
+  const ok = await unsubscribePush();
+  if (ok) toast('Notificaciones desactivadas');
+  else toast('No se pudo desactivar, intenta de nuevo');
+  renderPushStatus();
+}
+
 async function renderPushStatus() {
   const el = document.getElementById('push-status-row');
   if (!el) return;
@@ -66,12 +93,18 @@ async function renderPushStatus() {
   }
 
   const perm = Notification.permission;
-  if (perm === 'granted') {
+  const sub = await getActivePushSubscription();
+  const active = perm === 'granted' && !!sub;
+
+  if (active) {
     el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <span style="font-size:.8rem;color:var(--g);font-weight:600">✓ Notificaciones activas</span>
-      </div>
-      <span style="font-size:.72rem;color:var(--ink3)">Te aviso 30 min antes de cada pendiente</span>`;
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+        <div>
+          <div style="font-size:.8rem;color:var(--g);font-weight:600">✓ Notificaciones activas</div>
+          <div style="font-size:.72rem;color:var(--ink3);margin-top:2px">Te aviso 30 min antes de cada pendiente</div>
+        </div>
+        <button class="btn-ghost" style="font-size:.75rem;padding:.45rem .75rem;white-space:nowrap" onclick="disablePush()">Desactivar</button>
+      </div>`;
   } else if (perm === 'denied') {
     el.innerHTML = `
       <span style="font-size:.8rem;color:var(--r)">Notificaciones bloqueadas</span>
