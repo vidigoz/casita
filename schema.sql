@@ -154,8 +154,10 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   endpoint TEXT NOT NULL,
   subscription JSONB NOT NULL,
+  timezone TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS timezone TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_user_endpoint
   ON push_subscriptions (user_id, md5(endpoint));
 

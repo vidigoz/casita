@@ -34,7 +34,10 @@ async function subscribePush() {
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
   });
-  await api('push-subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
+  // La zona horaria del dispositivo define cuándo avisar (30 min antes en hora local)
+  let tz = 'America/Mexico_City';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch {}
+  await api('push-subscribe', { method: 'POST', body: { subscription: sub.toJSON(), tz } });
   return sub;
 }
 

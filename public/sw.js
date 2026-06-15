@@ -1,4 +1,4 @@
-const CACHE = 'casita-v1.0.4';
+const CACHE = 'casita-v1.0.5';
 const STATIC = [
   '/',
   '/styles.css',
