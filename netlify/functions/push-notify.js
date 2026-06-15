@@ -11,9 +11,11 @@ export const handler = async () => {
   try {
     await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT FALSE`;
 
-    // Avisar exactamente ~30 min antes. El vencimiento se calcula en la zona horaria
-    // de cada suscripción (AT TIME ZONE), no en UTC, para que funcione en cualquier zona
-    // y no se pierda en bordes de día. Ventana de 15 min = una sola corrida del cron (*/15).
+    // Avisar a partir de 30 min antes: cualquier tarea que venza dentro de los próximos
+    // 30 min y que aún no se haya avisado. Como marcamos notified=TRUE tras enviar, no se
+    // duplica. Esto garantiza que el aviso SIEMPRE llegue (entre 0 y 30 min antes) sin
+    // perderse en bordes del cron. El vencimiento se calcula en la zona horaria de cada
+    // suscripción (AT TIME ZONE), no en UTC, para que funcione en cualquier zona.
     const rows = await sql`
       SELECT t.id AS task_id, t.user_id, t.title, t.due_time, s.subscription
       FROM tasks t
@@ -23,8 +25,7 @@ export const handler = async () => {
         AND t.due_time IS NOT NULL
         AND t.due_date >= CURRENT_DATE - 1
         AND ((t.due_date + t.due_time) AT TIME ZONE COALESCE(s.timezone, 'America/Mexico_City'))
-            BETWEEN NOW() + INTERVAL '30 minutes'
-                AND NOW() + INTERVAL '45 minutes'`;
+            BETWEEN NOW() AND NOW() + INTERVAL '30 minutes'`;
 
     if (!rows.length) return { statusCode: 200, body: 'sin tareas' };
 

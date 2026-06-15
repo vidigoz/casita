@@ -20,4 +20,4 @@
   port = 8888
 
 [functions."push-notify"]
-  schedule = "*/15 * * * *"
+  schedule = "*/10 * * * *"
