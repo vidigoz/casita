@@ -246,7 +246,7 @@ function updateGreetingDateTime() {
 }
 
 // ── Navigation ───────────────────────────────────────────────
-const TABS_WITH_FAB = [];
+const TABS_WITH_FAB = ['pendientes','mandado','recetas','proyectos','tickets','ajustes'];
 
 function goTab(name, opts={}) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -258,7 +258,9 @@ function goTab(name, opts={}) {
 
   // FAB visibility
   const fab = document.getElementById('fab');
-  fab.classList.toggle('hide', !TABS_WITH_FAB.includes(name));
+  const showFab = TABS_WITH_FAB.includes(name);
+  fab.classList.toggle('hide', !showFab);
+  if (!showFab && typeof closeMiniChat === 'function') closeMiniChat();
 
   // Load data
   if (name==='inicio')     loadInicio();

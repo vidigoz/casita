@@ -117,6 +117,197 @@ function toggleVoice() {
   }
 }
 
+// ── MINI CHAT (FAB inline panel) ─────────────────────────────
+let miniChatOpen = false;
+let miniListening = false;
+let miniVoice = null;
+let miniSilenceTimer = null;
+
+function currentSection() {
+  return document.querySelector('.nav-btn.on')?.dataset.t || '';
+}
+
+const SECTION_LABELS = {
+  pendientes: 'pendientes',
+  mandado: 'lista de mandado',
+  despensa: 'despensa',
+  recetas: 'recetas',
+  proyectos: 'proyectos',
+  tickets: 'tickets',
+  ajustes: null
+};
+
+function toggleMiniChat() {
+  if (miniChatOpen) closeMiniChat();
+  else openMiniChat();
+}
+
+function openMiniChat() {
+  if (USER.guest) { toast('Crea una cuenta en Ajustes para usar el chat'); return; }
+  miniChatOpen = true;
+  const panel = document.getElementById('mini-chat');
+  panel.classList.remove('hidden');
+  requestAnimationFrame(() => panel.classList.add('visible'));
+  const fab = document.getElementById('fab');
+  if (fab) { fab.classList.add('open'); }
+  document.getElementById('fab-mic-icon')?.style.setProperty('display','none');
+  document.getElementById('fab-close-icon')?.style.setProperty('display','');
+  document.getElementById('big-mic-btn')?.classList.add('open');
+  document.getElementById('big-mic-icon')?.style.setProperty('display','none');
+  document.getElementById('big-mic-close-icon')?.style.setProperty('display','');
+  miniChatReset();
+  miniStartVoice();
+}
+
+function closeMiniChat() {
+  miniChatOpen = false;
+  miniStopVoice();
+  const panel = document.getElementById('mini-chat');
+  panel.classList.remove('visible');
+  setTimeout(() => panel.classList.add('hidden'), 200);
+  const fab = document.getElementById('fab');
+  if (fab) { fab.classList.remove('open', 'listening'); }
+  document.getElementById('fab-mic-icon')?.style.setProperty('display','');
+  document.getElementById('fab-close-icon')?.style.setProperty('display','none');
+  document.getElementById('big-mic-btn')?.classList.remove('open');
+  document.getElementById('big-mic-icon')?.style.setProperty('display','');
+  document.getElementById('big-mic-close-icon')?.style.setProperty('display','none');
+}
+
+function miniChatReset() {
+  const sec = currentSection();
+  const label = SECTION_LABELS[sec];
+  document.getElementById('mini-chat-label').textContent =
+    label ? `Escuchando (${label})…` : 'Escuchando…';
+  document.getElementById('mini-chat-transcript').textContent = '';
+  document.getElementById('mini-chat-transcript').className = 'mini-chat-transcript';
+  document.getElementById('mini-chat-reply').textContent = '';
+  document.getElementById('mini-chat-reply').classList.add('hidden');
+  document.getElementById('mini-chat-input').value = '';
+  miniSetDot('listening');
+}
+
+function miniSetDot(state) {
+  const dot = document.querySelector('.mini-chat-dot');
+  dot.className = 'mini-chat-dot' + (state === 'idle' ? ' idle' : state === 'thinking' ? ' thinking' : '');
+  const label = document.getElementById('mini-chat-label');
+  const sec = currentSection();
+  const secLabel = SECTION_LABELS[sec];
+  if (state === 'listening') label.textContent = secLabel ? `Escuchando (${secLabel})…` : 'Escuchando…';
+  if (state === 'thinking')  label.textContent = 'Casita está pensando…';
+  if (state === 'idle')      label.textContent = 'Listo';
+}
+
+function miniSetListening(on) {
+  miniListening = on;
+  document.getElementById('mini-mic-btn')?.classList.toggle('listening', on);
+  document.getElementById('fab')?.classList.toggle('listening', on);
+  if (on) miniSetDot('listening');
+}
+
+function miniStartVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { miniSetDot('idle'); return; }
+  if (miniVoice) { try { miniVoice.abort(); } catch {} }
+  miniVoice = new SR();
+  miniVoice.lang = 'es-MX';
+  miniVoice.continuous = false;
+  miniVoice.interimResults = true;
+
+  miniVoice.onstart = () => miniSetListening(true);
+  miniVoice.onaudiostart = () => miniSetListening(true);
+
+  miniVoice.onresult = e => {
+    if (miniSilenceTimer) clearTimeout(miniSilenceTimer);
+    let finalText = '', interimText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += t;
+      else interimText += t;
+    }
+    const tx = document.getElementById('mini-chat-transcript');
+    if (interimText) { tx.textContent = interimText.trim(); tx.className = 'mini-chat-transcript interim'; }
+    if (finalText.trim()) {
+      tx.textContent = finalText.trim(); tx.className = 'mini-chat-transcript';
+      miniChatSendText(finalText.trim());
+    }
+  };
+
+  miniVoice.onerror = e => {
+    miniSetListening(false);
+    if (e.error !== 'aborted' && e.error !== 'no-speech') {
+      toast(voiceErrorMessage(e.error));
+    }
+    if (e.error === 'no-speech') miniSetDot('idle');
+  };
+
+  miniVoice.onend = () => miniSetListening(false);
+
+  try {
+    miniVoice.start();
+    miniSilenceTimer = setTimeout(() => {
+      if (miniListening) { miniStopVoice(); miniSetDot('idle'); }
+    }, 12000);
+  } catch { miniSetDot('idle'); }
+}
+
+function miniStopVoice() {
+  if (miniSilenceTimer) { clearTimeout(miniSilenceTimer); miniSilenceTimer = null; }
+  if (miniVoice) { try { miniVoice.abort(); } catch {} miniVoice = null; }
+  miniSetListening(false);
+}
+
+function miniChatToggleMic() {
+  if (miniListening) miniStopVoice();
+  else miniStartVoice();
+}
+
+function miniChatSend() {
+  const inp = document.getElementById('mini-chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  document.getElementById('mini-chat-transcript').textContent = text;
+  document.getElementById('mini-chat-transcript').className = 'mini-chat-transcript';
+  miniChatSendText(text);
+}
+
+async function miniChatSendText(text) {
+  miniStopVoice();
+  miniSetDot('thinking');
+  const replyEl = document.getElementById('mini-chat-reply');
+  replyEl.classList.add('hidden');
+  replyEl.textContent = '';
+
+  const sec = currentSection();
+  const secLabel = SECTION_LABELS[sec];
+  const contextMsg = secLabel
+    ? `[El usuario está en la sección ${secLabel}. Solo actúa en esa sección a menos que pida explícitamente otra cosa.] ${text}`
+    : text;
+
+  // Registrar en historial del chat principal
+  addBubble('user', text);
+
+  try {
+    const d = await api('chat', { method: 'POST', body: { message: contextMsg, history: chatHistory.slice(-8) } });
+    const reply = d.reply || '…';
+    replyEl.textContent = reply;
+    replyEl.classList.remove('hidden');
+    // Guardar en historial con el texto original (sin prefijo de sección)
+    chatHistory.push({ role: 'user', content: text });
+    chatHistory.push({ role: 'assistant', content: reply });
+    addBubble('ai', reply);
+    miniSetDot('idle');
+    refreshCurrentTab();
+    setTimeout(() => { if (miniChatOpen) miniStartVoice(); }, 1200);
+  } catch (e) {
+    replyEl.textContent = '⚠ ' + e.message;
+    replyEl.classList.remove('hidden');
+    addBubble('ai', '⚠ ' + e.message);
+    miniSetDot('idle');
+  }
+}
+
 function openChatAndListen() {
   goTab('chat', {focus:false});
   startVoice();
