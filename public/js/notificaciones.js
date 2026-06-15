@@ -12,6 +12,11 @@ async function pushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
+// Preferencia del usuario (distinta del permiso del navegador).
+// Si el usuario desactiva, NO lo re-suscribimos aunque el permiso siga en 'granted'.
+function pushWanted() { return S.g('push_enabled', false) === true; }
+function setPushWanted(v) { S.s('push_enabled', !!v); }
+
 async function getActivePushSubscription() {
   if (!await pushSupported()) return null;
   try {
@@ -20,42 +25,29 @@ async function getActivePushSubscription() {
   } catch { return null; }
 }
 
+// Crea/recupera la suscripción y la registra en el servidor.
+// Lanza el error real si algo falla (para poder mostrarlo).
 async function subscribePush() {
-  if (!await pushSupported()) return false;
-  if (USER?.guest) return false;
-
-  try {
-    const reg = await navigator.serviceWorker.ready;
-    const existing = await reg.pushManager.getSubscription();
-    const sub = existing || await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-    await api('push-subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
-    return true;
-  } catch (e) {
-    console.error('subscribePush error:', e);
-    return false;
-  }
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  const sub = existing || await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  });
+  await api('push-subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
+  return sub;
 }
 
 async function unsubscribePush() {
-  if (!await pushSupported()) return false;
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) return;
+  const subJson = sub.toJSON();
+  await sub.unsubscribe();
   try {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (!sub) return true;
-    const subJson = sub.toJSON();
-    await sub.unsubscribe();
-    try {
-      await api('push-subscribe', { method: 'POST', body: { action: 'unsubscribe', subscription: subJson } });
-    } catch (e) {
-      console.warn('No se pudo borrar suscripción del servidor:', e);
-    }
-    return true;
+    await api('push-subscribe', { method: 'POST', body: { action: 'unsubscribe', subscription: subJson } });
   } catch (e) {
-    console.error('unsubscribePush error:', e);
-    return false;
+    console.warn('No se pudo borrar suscripción del servidor:', e);
   }
 }
 
@@ -69,21 +61,33 @@ async function requestPushPermission() {
     return;
   }
 
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    const ok = await subscribePush();
-    if (ok) toast('¡Notificaciones activadas! Te avisaré 30 min antes ✓');
-    else toast('No se pudo activar, intenta de nuevo');
-  } else {
-    toast('Permiso denegado. Actívalas desde ajustes del navegador');
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      toast('Permiso denegado. Actívalas en ajustes del navegador');
+      renderPushStatus();
+      return;
+    }
+    await subscribePush();
+    setPushWanted(true);
+    toast('¡Notificaciones activadas! Te avisaré 30 min antes ✓');
+  } catch (e) {
+    console.error('activar push falló:', e);
+    // Mostramos el error real para poder diagnosticar
+    toast('No se pudo activar: ' + (e.message || e.name || 'error desconocido'));
   }
   renderPushStatus();
 }
 
 async function disablePush() {
-  const ok = await unsubscribePush();
-  if (ok) toast('Notificaciones desactivadas');
-  else toast('No se pudo desactivar, intenta de nuevo');
+  setPushWanted(false); // primero marcamos preferencia para que initPush no re-suscriba
+  try {
+    await unsubscribePush();
+    toast('Notificaciones desactivadas');
+  } catch (e) {
+    console.error('desactivar push falló:', e);
+    toast('Desactivadas en este dispositivo');
+  }
   renderPushStatus();
 }
 
@@ -95,10 +99,14 @@ async function renderPushStatus() {
     el.innerHTML = '<span style="font-size:.8rem;color:var(--ink3)">Tu navegador no soporta notificaciones</span>';
     return;
   }
+  if (USER?.guest) {
+    el.innerHTML = '<span style="font-size:.8rem;color:var(--ink3)">Crea una cuenta para activar notificaciones</span>';
+    return;
+  }
 
   const perm = Notification.permission;
   const sub = await getActivePushSubscription();
-  const active = perm === 'granted' && !!sub;
+  const active = perm === 'granted' && !!sub && pushWanted();
 
   if (active) {
     el.innerHTML = `
@@ -122,12 +130,17 @@ async function renderPushStatus() {
   }
 }
 
-// Auto-suscribir si ya tiene permiso pero aún no está suscrito
+// Al cargar: solo re-suscribir si el usuario YA había activado (preferencia true)
+// y el permiso sigue concedido. Así, si desactivó, no vuelve a salir activado.
 async function initPush() {
   if (!await pushSupported()) return;
   if (USER?.guest) return;
-  if (Notification.permission === 'granted') {
+  if (!pushWanted()) return;
+  if (Notification.permission !== 'granted') return;
+  try {
     await subscribePush();
-    renderPushStatus();
+  } catch (e) {
+    console.warn('re-suscribir al cargar falló:', e);
   }
+  renderPushStatus();
 }

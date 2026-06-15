@@ -1,4 +1,4 @@
-const CACHE = 'casita-v1.0.3';
+const CACHE = 'casita-v1.0.4';
 const STATIC = [
   '/',
   '/styles.css',
@@ -41,7 +41,7 @@ self.addEventListener('push', ev => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: data.icon || '/icons/icon-192.png',
-      badge: data.badge || '/icons/icon-96.png',
+      badge: data.badge || '/icons/icon-192.png',
       data: data.data || {},
       vibrate: [200, 100, 200]
     })
