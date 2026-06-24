@@ -396,9 +396,13 @@ body::before{
 .recipe-tip{font-size:.85rem;line-height:1.5;color:var(--ink2);background:var(--bg2);border-radius:12px;padding:.75rem .875rem;margin-top:.75rem}
 
 /* ── PROYECTOS ──────────────────────────────────────── */
-.proj-card{display:flex;align-items:center;gap:.875rem;padding:.875rem 1.1rem;cursor:pointer;border-bottom:.5px solid var(--bg3);transition:background .15s}
+.proj-card{display:flex;align-items:center;gap:.875rem;padding:.875rem 1.1rem;cursor:pointer;border-bottom:.5px solid var(--bg3);transition:background .15s,opacity .15s,transform .15s;position:relative}
 .proj-card:first-child{border-top:.5px solid var(--bg3)}
 .proj-card:hover{background:var(--bg2)}
+.proj-card.dragging{opacity:.4;background:var(--bg2)}
+.proj-card.drag-over{background:var(--gbg)}
+.proj-drag-handle{width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink3);opacity:.35;transition:opacity .15s;cursor:grab;flex-shrink:0;touch-action:none}
+.proj-drag-handle:active{cursor:grabbing;opacity:.7}
 .proj-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.375rem;flex-shrink:0}
 .proj-icon-check{background:var(--gbg)}
 .proj-icon-money{background:var(--ybg)}
@@ -407,7 +411,11 @@ body::before{
 .proj-icon-gastos{background:#FFE8E0}
 .proj-name{font-family:var(--serif);font-size:1rem;font-weight:500;color:var(--ink)}
 .proj-meta{font-size:.72rem;color:var(--ink3);margin-top:2px}
-.proj-pct{font-size:.875rem;font-weight:600;color:var(--g);margin-left:auto;flex-shrink:0}
+.proj-pct{font-size:.875rem;font-weight:600;color:var(--g);flex-shrink:0}
+.proj-card-actions{display:flex;align-items:center;gap:.25rem;margin-left:auto;flex-shrink:0}
+.proj-menu-btn{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink3);opacity:.5;transition:opacity .15s,background .15s;flex-shrink:0}
+.proj-menu-btn:hover{opacity:1;background:var(--bg3)}
+.proj-menu-btn:active{opacity:1;background:var(--bg3)}
 .proj-title{font-family:var(--serif);font-size:1.5rem;font-weight:500;margin-bottom:.25rem}
 .edit-title-btn{width:28px;height:28px;border-radius:50%;color:var(--ink3);opacity:.4;transition:all .15s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .edit-title-btn:hover{opacity:1;color:var(--g);background:var(--bg2)}

@@ -5,6 +5,17 @@ async function migrateProjectTypes() {
   await sql`ALTER TABLE projects ADD CONSTRAINT projects_type_check CHECK (type IN ('checklist','tracker_dinero','presupuesto_lista','rutina_hogar','gastos_hogar'))`;
 }
 
+function emptyData(type) {
+  switch(type) {
+    case 'checklist':         return {items:[], checked:{}};
+    case 'tracker_dinero':    return {meta_total:0, abonos:[]};
+    case 'presupuesto_lista': return {items:[]};
+    case 'rutina_hogar':      return {tareas:[]};
+    case 'gastos_hogar':      return {presupuesto_mes:0, gastos:[]};
+    default:                  return {};
+  }
+}
+
 async function getProject(id, userId) {
   const r = await sql`SELECT data FROM projects WHERE id=${id} AND user_id=${userId}`;
   if (!r.length) return null;
@@ -21,7 +32,8 @@ export const handler = async ev => {
   try {
     if (ev.httpMethod==='GET') {
       await migrateProjectTypes();
-      const items = await sql`SELECT * FROM projects WHERE user_id=${userId} AND archived=FALSE ORDER BY updated_at DESC`;
+      await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS sort_order INTEGER`;
+      const items = await sql`SELECT * FROM projects WHERE user_id=${userId} AND archived=FALSE ORDER BY sort_order ASC NULLS LAST, updated_at DESC`;
       return ok({items});
     }
 
@@ -181,6 +193,29 @@ export const handler = async ev => {
     }
 
     // ── GENERALES ─────────────────────────────────────────
+    if (b.action==='reorder') {
+      // b.order = [{id, sort_order}, ...]
+      if (!Array.isArray(b.order)) return err('order requerido',400);
+      await Promise.all(b.order.map(({id:pid, sort_order}) =>
+        sql`UPDATE projects SET sort_order=${sort_order} WHERE id=${pid} AND user_id=${userId}`
+      ));
+      return ok({success:true});
+    }
+    if (b.action==='duplicate') {
+      const src = await sql`SELECT title,type,data FROM projects WHERE id=${id} AND user_id=${userId}`;
+      if (!src.length) return err('Proyecto no encontrado',404);
+      const {title, type, data} = src[0];
+      // build next available name: "Título (1)", "Título (2)", etc.
+      const existing = await sql`SELECT title FROM projects WHERE user_id=${userId} AND archived=FALSE`;
+      const baseName = title.replace(/ \(\d+\)$/, '');
+      const taken = new Set(existing.map(r=>r.title));
+      let n = 1;
+      while (taken.has(`${baseName} (${n})`)) n++;
+      const newTitle = `${baseName} (${n})`;
+      const newData = b.withData ? data : emptyData(type);
+      await sql`INSERT INTO projects (user_id,title,type,data) VALUES (${userId},${newTitle},${type},${JSON.stringify(newData)})`;
+      return ok({success:true});
+    }
     if (b.action==='rename') {
       const newTitle = (b.title||'').trim();
       if (!newTitle) return err('Título requerido',400);

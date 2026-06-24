@@ -64,16 +64,25 @@ function renderProjects(items) {
     const m = PROJ_META[p.type] || PROJ_META.checklist;
     const {meta, pct, barCls} = projMeta(p);
     return `
-    <div class="proj-card" onclick="openProject(${p.id})">
+    <div class="proj-card" data-proj-id="${p.id}" onclick="if(!_tdMoved)openProject(${p.id})">
+      <div class="proj-drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation();initProjDrag(event,this.closest('.proj-card'))" title="Mover">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+      </div>
       <div class="proj-icon ${m.cls}">${m.icon}</div>
       <div style="flex:1;min-width:0">
         <div class="proj-name">${esc(p.title)}</div>
         <div class="proj-meta">${meta}</div>
         <div class="pbar" style="margin-top:.5rem"><div class="pbar-fill ${barCls}" style="width:${pct}%"></div></div>
       </div>
-      <div class="proj-pct">${pct}%</div>
+      <div class="proj-card-actions">
+        <div class="proj-pct">${pct}%</div>
+        <button class="proj-menu-btn" onclick="event.stopPropagation();showProjMenu(${p.id},this)" title="Opciones">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+        </button>
+      </div>
     </div>`;
   }).join('');
+  initProjDragList(el);
 }
 
 let currentProjectId = null;
@@ -147,7 +156,7 @@ function renderChecklist(el, p) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
     </div>
-    <button class="btn-ghost" onclick="archiveProject(${p.id})">archivar proyecto</button>`;
+`;
 }
 
 // ── TRACKER DINERO ─────────────────────────────────────────
@@ -185,7 +194,7 @@ function renderTrackerDinero(el, p) {
             <button class="del-btn" onclick="event.stopPropagation();deleteEntry('abono',${p.id},null,${a.id})">×</button>
           </div>`;}).join('')}
       </div>` : ''}
-    <button class="btn-ghost" onclick="archiveProject(${p.id})">archivar proyecto</button>`;
+`;
 }
 
 // ── PRESUPUESTO CON LISTA ──────────────────────────────────
@@ -226,7 +235,7 @@ function renderPresupuesto(el, p) {
         </div>`;}).join('')
       : '<div class="empty" style="padding:1rem 0"><p>Agrega los gastos del evento</p></div>'}
     </div>
-    <button class="btn-ghost" onclick="archiveProject(${p.id})">archivar proyecto</button>`;
+`;
 }
 
 // ── RUTINA DEL HOGAR ───────────────────────────────────────
@@ -274,7 +283,7 @@ function renderRutina(el, p) {
     ${grupoHTML('semanal', grupos.semanal)}
     ${grupoHTML('mensual', grupos.mensual)}
     ${!tareas.length ? '<div class="card"><div class="empty" style="padding:1rem"><p>Agrega las tareas de tu rutina</p></div></div>' : ''}
-    <button class="btn-ghost" onclick="archiveProject(${p.id})">archivar proyecto</button>`;
+`;
 }
 
 // ── GASTOS DEL HOGAR ───────────────────────────────────────
@@ -318,7 +327,7 @@ function renderGastos(el, p) {
             <button class="del-btn" onclick="event.stopPropagation();deleteEntry('gasto',${p.id},null,${g.id})">×</button>
           </div>`;}).join('')}
       </div>` : ''}
-    <button class="btn-ghost" onclick="archiveProject(${p.id})">archivar proyecto</button>`;
+`;
 }
 
 // ── ACCIONES ───────────────────────────────────────────────
@@ -377,9 +386,210 @@ async function addGasto(id) {
   } catch(e) { toast(e.message); }
 }
 async function archiveProject(id) {
-  if (!confirm('¿Archivar este proyecto?')) return;
-  try { await api('projects',{method:'POST',body:{action:'archive',id}}); loadProjects(); }
+  const confirmed = await showConfirmDialog(
+    'Archivar proyecto',
+    '¿Estás seguro? El proyecto se archivará y dejará de aparecer en tu lista.',
+    'Archivar',
+    'Cancelar'
+  );
+  if (!confirmed) return;
+  try { await apiAuth('projects',{method:'POST',body:{action:'archive',id}}); loadProjects(); }
   catch(e) { toast(e.message); }
+}
+
+function showConfirmDialog(title, message, confirmLabel, cancelLabel) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:flex-end;justify-content:center';
+    overlay.innerHTML = `
+      <div style="background:var(--white);border-radius:22px 22px 0 0;padding:1.5rem 1.25rem 2rem;width:100%;max-width:480px;animation:sheetUp .2s ease">
+        <div style="width:36px;height:4px;background:var(--bg3);border-radius:2px;margin:0 auto .875rem"></div>
+        <h3 style="font-family:var(--serif);font-size:1.125rem;font-weight:500;margin-bottom:.25rem">${title}</h3>
+        <p style="font-size:.825rem;color:var(--ink3);margin-bottom:1.25rem">${message}</p>
+        <div style="display:flex;flex-direction:column;gap:.625rem">
+          <button id="confirm-ok-btn" style="padding:.875rem 1rem;border-radius:14px;background:var(--rbg);color:var(--r);font-weight:600;font-size:.9rem;transition:opacity .15s">
+            ${confirmLabel}
+          </button>
+          <button id="confirm-cancel-btn" style="padding:.75rem 1rem;border-radius:14px;font-size:.875rem;color:var(--ink3)">
+            ${cancelLabel}
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = result => { overlay.remove(); resolve(result); };
+    overlay.querySelector('#confirm-ok-btn').onclick    = () => cleanup(true);
+    overlay.querySelector('#confirm-cancel-btn').onclick = () => cleanup(false);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
+  });
+}
+
+// ── DRAG & DROP REORDENAR ──────────────────────────────────
+function initProjDragList(list) {
+  // desktop: HTML5 drag
+  list.querySelectorAll('.proj-card').forEach(card => {
+    card.draggable = true;
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.effectAllowed = 'move';
+      card.classList.add('dragging');
+      list._dragSrc = card;
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      list.querySelectorAll('.proj-card').forEach(c => c.classList.remove('drag-over'));
+      saveProjOrder(list);
+    });
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (card === list._dragSrc) return;
+      list.querySelectorAll('.proj-card').forEach(c => c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
+      const src = list._dragSrc;
+      const cards = [...list.querySelectorAll('.proj-card')];
+      const srcIdx = cards.indexOf(src), dstIdx = cards.indexOf(card);
+      if (srcIdx < dstIdx) card.after(src); else card.before(src);
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => { e.preventDefault(); card.classList.remove('drag-over'); });
+  });
+}
+
+// touch drag — llamado desde ontouchstart del handle
+let _td = null;
+let _tdMoved = false;
+function initProjDrag(e, card) {
+  const list = card.parentElement;
+  const touch = e.touches[0];
+  const rect = card.getBoundingClientRect();
+  const offsetY = touch.clientY - rect.top;
+
+  // ghost visual
+  const ghost = card.cloneNode(true);
+  ghost.style.cssText = `position:fixed;left:${rect.left}px;width:${rect.width}px;top:${touch.clientY - offsetY}px;opacity:.85;pointer-events:none;z-index:9999;border-radius:10px;background:var(--white);box-shadow:var(--sh2)`;
+  document.body.appendChild(ghost);
+
+  card.classList.add('dragging');
+  _td = {card, list, ghost, offsetY, moved: false};
+
+  const onMove = ev => {
+    ev.preventDefault();
+    const t = ev.touches[0];
+    ghost.style.top = (t.clientY - offsetY) + 'px';
+    _td.moved = true;
+    _tdMoved = true;
+
+    const mid = t.clientY;
+    const cards = [...list.querySelectorAll('.proj-card:not(.dragging)')];
+    list.querySelectorAll('.proj-card').forEach(c => c.classList.remove('drag-over'));
+    for (const c of cards) {
+      const cr = c.getBoundingClientRect();
+      if (mid < cr.top + cr.height / 2) {
+        c.classList.add('drag-over');
+        list.insertBefore(card, c);
+        break;
+      }
+      if (c === cards[cards.length - 1]) {
+        list.appendChild(card);
+      }
+    }
+  };
+
+  const onEnd = () => {
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onEnd);
+    ghost.remove();
+    card.classList.remove('dragging');
+    list.querySelectorAll('.proj-card').forEach(c => c.classList.remove('drag-over'));
+    if (_td.moved) saveProjOrder(list);
+    _td = null;
+    // reset flag after a tick so the onclick que sigue no abre el proyecto
+    setTimeout(() => { _tdMoved = false; }, 50);
+  };
+
+  document.addEventListener('touchmove', onMove, {passive: false});
+  document.addEventListener('touchend', onEnd);
+}
+
+async function saveProjOrder(list) {
+  const cards = [...list.querySelectorAll('.proj-card')];
+  const order = cards.map((c, i) => ({id: parseInt(c.dataset.projId), sort_order: i}));
+  try {
+    await apiAuth('projects', {method:'POST', body:{action:'reorder', order}});
+  } catch(e) { console.error('reorder:', e); }
+}
+
+// ── MENÚ DE PROYECTO ───────────────────────────────────────
+let _projMenuOpen = null;
+function showProjMenu(id, btn) {
+  closeProjMenu();
+  const menu = document.createElement('div');
+  menu.id = 'proj-menu-popup';
+  menu.style.cssText = 'position:fixed;background:var(--white);border:.5px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:.375rem;z-index:999;min-width:170px';
+  const menuItemStyle = 'display:flex;align-items:center;gap:.625rem;width:100%;padding:.625rem .75rem;border-radius:10px;font-size:.875rem;color:var(--ink);transition:background .15s';
+  menu.innerHTML = `
+    <button onclick="closeProjMenu();duplicateProject(${id})" style="${menuItemStyle}" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Duplicar proyecto
+    </button>
+    <button onclick="closeProjMenu();archiveProject(${id})" style="${menuItemStyle}" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+      Archivar proyecto
+    </button>`;
+  const r = btn.getBoundingClientRect();
+  document.body.appendChild(menu);
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  let left = r.right - mw, top = r.bottom + 4;
+  if (left < 8) left = 8;
+  if (top + mh > window.innerHeight - 8) top = r.top - mh - 4;
+  menu.style.left = left + 'px';
+  menu.style.top  = top  + 'px';
+  _projMenuOpen = { menu, handler: e => { if (!menu.contains(e.target)) closeProjMenu(); } };
+  setTimeout(() => document.addEventListener('click', _projMenuOpen.handler), 0);
+}
+function closeProjMenu() {
+  if (!_projMenuOpen) return;
+  _projMenuOpen.menu.remove();
+  document.removeEventListener('click', _projMenuOpen.handler);
+  _projMenuOpen = null;
+}
+
+async function duplicateProject(id) {
+  const choice = await showDuplicateDialog();
+  if (choice === null) return;
+  try {
+    await apiAuth('projects', {method:'POST', body:{action:'duplicate', id, withData: choice === 'data'}});
+    loadProjects();
+    toast('Proyecto duplicado ✓');
+  } catch(e) { toast(e.message); }
+}
+
+function showDuplicateDialog() {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:flex-end;justify-content:center';
+    overlay.innerHTML = `
+      <div style="background:var(--white);border-radius:22px 22px 0 0;padding:1.5rem 1.25rem 2rem;width:100%;max-width:480px;animation:sheetUp .2s ease">
+        <div style="width:36px;height:4px;background:var(--bg3);border-radius:2px;margin:0 auto .875rem"></div>
+        <h3 style="font-family:var(--serif);font-size:1.125rem;font-weight:500;margin-bottom:.25rem">Duplicar proyecto</h3>
+        <p style="font-size:.825rem;color:var(--ink3);margin-bottom:1.25rem">¿Cómo quieres duplicarlo?</p>
+        <div style="display:flex;flex-direction:column;gap:.625rem">
+          <button id="dup-data-btn" style="padding:.875rem 1rem;border-radius:14px;border:.5px solid var(--line);text-align:left;transition:background .15s;background:var(--white)">
+            <div style="font-weight:500;font-size:.9rem;color:var(--ink)">Con información</div>
+            <div style="font-size:.75rem;color:var(--ink3);margin-top:2px">Copia todos los datos del proyecto original</div>
+          </button>
+          <button id="dup-blank-btn" style="padding:.875rem 1rem;border-radius:14px;border:.5px solid var(--line);text-align:left;transition:background .15s;background:var(--white)">
+            <div style="font-weight:500;font-size:.9rem;color:var(--ink)">En blanco</div>
+            <div style="font-size:.75rem;color:var(--ink3);margin-top:2px">Mismo tipo de proyecto, sin datos</div>
+          </button>
+        </div>
+        <button id="dup-cancel-btn" style="width:100%;margin-top:.875rem;padding:.75rem;border-radius:14px;font-size:.875rem;color:var(--ink3)">Cancelar</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = choice => { overlay.remove(); resolve(choice); };
+    overlay.querySelector('#dup-data-btn').onclick  = () => cleanup('data');
+    overlay.querySelector('#dup-blank-btn').onclick = () => cleanup('blank');
+    overlay.querySelector('#dup-cancel-btn').onclick = () => cleanup(null);
+    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });
+  });
 }
 
 // ── BOTTOM SHEET DE EDICIÓN DE ENTRADAS ───────────────────
