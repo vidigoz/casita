@@ -33,6 +33,7 @@ export const handler = async ev => {
     if (ev.httpMethod==='GET') {
       await migrateProjectTypes();
       await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS sort_order INTEGER`;
+      await sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS icon TEXT`;
       const items = await sql`SELECT * FROM projects WHERE user_id=${userId} AND archived=FALSE ORDER BY sort_order ASC NULLS LAST, updated_at DESC`;
       return ok({items});
     }
@@ -193,6 +194,11 @@ export const handler = async ev => {
     }
 
     // ── GENERALES ─────────────────────────────────────────
+    if (b.action==='set_icon') {
+      const icon = (b.icon||'').trim().slice(0,8);
+      await sql`UPDATE projects SET icon=${icon||null},updated_at=NOW() WHERE id=${id} AND user_id=${userId}`;
+      return ok({success:true});
+    }
     if (b.action==='reorder') {
       // b.order = [{id, sort_order}, ...]
       if (!Array.isArray(b.order)) return err('order requerido',400);

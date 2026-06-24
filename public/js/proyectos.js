@@ -68,7 +68,7 @@ function renderProjects(items) {
       <div class="proj-drag-handle" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation();initProjDrag(event,this.closest('.proj-card'))" title="Mover">
         <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
       </div>
-      <div class="proj-icon ${m.cls}">${m.icon}</div>
+      <div class="proj-icon ${m.cls}">${p.icon || m.icon}</div>
       <div style="flex:1;min-width:0">
         <div class="proj-name">${esc(p.title)}</div>
         <div class="proj-meta">${meta}</div>
@@ -526,6 +526,10 @@ function showProjMenu(id, btn) {
   menu.style.cssText = 'position:fixed;background:var(--white);border:.5px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:.375rem;z-index:999;min-width:170px';
   const menuItemStyle = 'display:flex;align-items:center;gap:.625rem;width:100%;padding:.625rem .75rem;border-radius:10px;font-size:.875rem;color:var(--ink);transition:background .15s';
   menu.innerHTML = `
+    <button onclick="closeProjMenu();pickProjectEmoji(${id})" style="${menuItemStyle}" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      Cambiar ícono
+    </button>
     <button onclick="closeProjMenu();duplicateProject(${id})" style="${menuItemStyle}" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       Duplicar proyecto
@@ -550,6 +554,30 @@ function closeProjMenu() {
   _projMenuOpen.menu.remove();
   document.removeEventListener('click', _projMenuOpen.handler);
   _projMenuOpen = null;
+}
+
+function pickProjectEmoji(id) {
+  // input oculto que dispara el teclado emoji en móvil
+  let input = document.getElementById('_emoji-picker-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.id = '_emoji-picker-input';
+    input.inputMode = 'text';
+    input.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0';
+    document.body.appendChild(input);
+  }
+  input.value = '';
+  input.oninput = async () => {
+    const val = [...input.value].find(c => /\p{Emoji}/u.test(c) && c !== ' ');
+    if (!val) return;
+    input.blur();
+    input.oninput = null;
+    try {
+      await apiAuth('projects', {method:'POST', body:{action:'set_icon', id, icon: val}});
+      loadProjects();
+    } catch(e) { toast(e.message); }
+  };
+  input.focus();
 }
 
 async function duplicateProject(id) {
