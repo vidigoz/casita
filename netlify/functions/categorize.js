@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { textAI } from './_ai.js';
 import { ok, err, cors, body, uid } from './_lib.js';
 
 const CATEGORIES = ['frutas','verduras','carnes','lacteos','pan','abarrotes','limpieza','huevo','otros'];
@@ -10,13 +10,12 @@ export const handler = async ev => {
   const {name} = body(ev);
   if (!name) return err('Falta el nombre',400);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return ok({category:'otros'});
+  const ai = textAI('claude-haiku-4-5-20251001');
+  if (!ai) return ok({category:'otros'});
 
   try {
-    const client = new Anthropic({apiKey});
-    const res = await client.messages.create({
-      model:'claude-haiku-4-5-20251001',
+    const res = await ai.client.messages.create({
+      model:ai.model,
       max_tokens:10,
       messages:[{role:'user',content:`Categoriza "${name}" en una de estas categorías de despensa: ${CATEGORIES.join(', ')}. Responde SOLO con el nombre exacto de la categoría, sin explicación.`}]
     });

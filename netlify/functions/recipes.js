@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { textAI } from './_ai.js';
 import { createHash } from 'node:crypto';
 import { ok, err, cors, body, uid, sql } from './_lib.js';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 const CACHE_VERSION = 'claude-recipes-v1';
 
 function normalizeText(value='') {
@@ -148,11 +148,10 @@ async function saveCachedRecipes(userId, pantryHash, recipes) {
   `;
 }
 
-async function generateRecipes(client, pantry, householdSize, offset) {
+async function generateRecipes({client, model}, pantry, householdSize, offset) {
   const prompt = buildPrompt(pantry, householdSize, offset);
-  const res = await client.beta.messages.create({
-    betas:['prompt-caching-2024-07-31'],
-    model: MODEL,
+  const res = await client.messages.create({
+    model,
     max_tokens: 3500,
     system:[{ type:'text', text:prompt, cache_control:{ type:'ephemeral' } }],
     messages:[{ role:'user', content:'Genera las recetas ahora.' }]
@@ -174,8 +173,8 @@ export const handler = async ev => {
 
   const { offset=0 } = body(ev);
   const offsetValue = Number.isFinite(Number(offset)) ? Number(offset) : 0;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) return err('Sin Anthropic API key', 500);
+  const ai = textAI(CLAUDE_MODEL);
+  if (!ai) return err('Sin API key de IA', 500);
 
   try {
     await ensureRecipeCacheTable();
@@ -200,8 +199,7 @@ export const handler = async ev => {
       if (cached) return ok({ recipes: cached });
     }
 
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const recipes = await generateRecipes(client, pantry, householdSize, offsetValue);
+    const recipes = await generateRecipes(ai, pantry, householdSize, offsetValue);
 
     if (offsetValue === 0) {
       await saveCachedRecipes(userId, pantryHash, recipes);

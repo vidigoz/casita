@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { textAI } from './_ai.js';
 import { sql, ok, err, cors, body, uid } from './_lib.js';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 
 function buildSystemPrompt(user) {
   const today = new Date().toISOString().split('T')[0];
@@ -237,12 +237,12 @@ export const handler = async ev => {
   const {message, history=[]} = body(ev);
   if (!message) return err('Mensaje vacío');
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return err('Sin API key',500);
+  const ai = textAI(CLAUDE_MODEL);
+  if (!ai) return err('Sin API key',500);
 
   try {
     await ensurePriceMemory();
-    const client = new Anthropic({apiKey});
+    const {client, model} = ai;
     const userRows = await sql`SELECT casita_name,household_size,city FROM users WHERE id=${userId}`;
     const system = buildSystemPrompt(userRows[0] || {});
     const recentHistory = history.slice(-6).map(h => ({role:h.role, content:h.content}));
@@ -252,9 +252,8 @@ export const handler = async ev => {
     await sql`INSERT INTO chat_history(user_id,role,content) VALUES(${userId},'user',${message})`;
 
     for (let i=0; i<5; i++) {
-      const res = await client.beta.messages.create({
-        betas:['prompt-caching-2024-07-31'],
-        model: MODEL,
+      const res = await client.messages.create({
+        model,
         max_tokens: 700,
         system:[{type:'text',text:system,cache_control:{type:'ephemeral'}}],
         tools: toolsWithPromptCache(),
