@@ -26,7 +26,7 @@ export function textAI(claudeModel = 'claude-haiku-4-5-20251001') {
 }
 
 // DeepSeek no acepta imágenes, así que la visión (lectura de tickets) sigue en Claude.
-export function visionAI(claudeModel = 'claude-sonnet-4-5') {
+export function visionAI(claudeModel = 'claude-sonnet-5-5') {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return null;
   return { provider: 'anthropic', client: new Anthropic({ apiKey: anthropicKey }), model: claudeModel };

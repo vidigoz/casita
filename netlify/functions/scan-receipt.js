@@ -10,7 +10,7 @@ const handler = async ev => {
   if (imageSizeBytes(image_base64) > 5 * 1024 * 1024) {
     return err('Imagen demasiado grande. Toma la foto un poco más lejos o vuelve a intentarlo.',413);
   }
-  const vision = visionAI('claude-sonnet-4-5');
+  const vision = visionAI('claude-sonnet-5-5');
   if (!vision) return err('Leer tickets requiere ANTHROPIC_API_KEY (DeepSeek no lee imágenes)',500);
   const ai = textAI('claude-haiku-4-5-20251001') || vision;
 
