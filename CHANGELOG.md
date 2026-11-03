@@ -1,5 +1,9 @@
 # Changelog — Casita
 
+## v1.1.0 (2026-11-03)
+- IA: el chat, las recetas, la categorización de productos y el matching del mandado ahora usan DeepSeek cuando está configurada `DEEPSEEK_API_KEY` (si no, siguen con Claude)
+- Scan ticket: la lectura de la foto sigue con Claude (DeepSeek no lee imágenes), ahora con el modelo `claude-sonnet-4-5` y la función en el formato actual de Netlify
+
 ## v0.0.5 (2026-05-22)
 - Recetas: eliminar banner con ícono, mostrar tipo de comida + mini descripción
 - Recetas: no recargar al volver a la pantalla; persistir en localStorage al cerrar app

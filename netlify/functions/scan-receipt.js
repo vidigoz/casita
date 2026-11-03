@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { textAI, visionAI } from './_ai.js';
 import { sql, ok, err, cors, body, uid } from './_lib.js';
 
-export const handler = async ev => {
+const handler = async ev => {
   if (ev.httpMethod==='OPTIONS') return cors();
   if (ev.httpMethod!=='POST') return err('Method not allowed',405);
   const userId = uid(ev); if (!userId) return err('No autenticado',401);
@@ -10,15 +10,15 @@ export const handler = async ev => {
   if (imageSizeBytes(image_base64) > 5 * 1024 * 1024) {
     return err('Imagen demasiado grande. Toma la foto un poco más lejos o vuelve a intentarlo.',413);
   }
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return err('Sin API key',500);
+  const vision = visionAI('claude-sonnet-4-5');
+  if (!vision) return err('Leer tickets requiere ANTHROPIC_API_KEY (DeepSeek no lee imágenes)',500);
+  const ai = textAI('claude-haiku-4-5-20251001') || vision;
 
   try {
-    const client = new Anthropic({apiKey});
 
     // 1. Leer el ticket con Sonnet (visión)
-    const res = await client.messages.create({
-      model:'claude-sonnet-4-20250514',
+    const res = await vision.client.messages.create({
+      model:vision.model,
       max_tokens:2048,
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mime_type,data:image_base64}},
@@ -49,8 +49,8 @@ Nombre limpio: "JTOM SALAD KG" → "Jitomate". Marcas conocidas: Lala, Bimbo, La
     const pendientes = await sql`SELECT id, name FROM shopping_list WHERE user_id=${userId} AND done=FALSE`;
     if (pendientes.length > 0 && parsed.productos?.length > 0) {
       const comprados = parsed.productos.map(p=>p.nombre).filter(Boolean);
-      const matchRes = await client.messages.create({
-        model:'claude-haiku-4-5-20251001',
+      const matchRes = await ai.client.messages.create({
+        model:ai.model,
         max_tokens:512,
         messages:[{role:'user',content:`Tienes una lista de compras pendientes y una lista de productos comprados en un ticket.
 Determina cuáles items del mandado fueron comprados, aunque los nombres no coincidan exactamente (por ejemplo "limones" y "Limón" son lo mismo).
@@ -136,3 +136,14 @@ function productKey(name) {
     .trim()
     .replace(/\s+/g,' ');
 }
+
+// Runtime v2 (necesario para recibir las credenciales del AI Gateway).
+export default async (req) => {
+  const ev = {
+    httpMethod: req.method,
+    headers: Object.fromEntries(req.headers),
+    body: req.method === 'GET' || req.method === 'HEAD' ? '' : await req.text()
+  };
+  const r = await handler(ev);
+  return new Response(r.statusCode === 204 ? null : r.body, { status: r.statusCode, headers: r.headers });
+};
